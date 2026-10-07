@@ -14,9 +14,11 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 
-import { auth as authApi, type TokenPair, type User } from "@/lib/api"
+import { ApiError, auth as authApi, type TokenPair, type User } from "@/lib/api"
 
 const STORAGE_KEY = "ailusion.session"
+/** Đánh dấu cho trang đăng nhập biết phải báo "phiên đã hết hạn". */
+export const SESSION_EXPIRED_KEY = "ailusion.session-expired"
 
 type Session = { tokens: TokenPair; user: User }
 
@@ -32,6 +34,11 @@ type AuthContextValue = {
     fullName?: string
   ) => Promise<void>
   logout: () => Promise<void>
+  /**
+   * Gọi API cần đăng nhập. Access token hết hạn (401) thì tự đổi bằng refresh token rồi gọi
+   * lại đúng một lần; refresh token cũng hết hạn thì đăng xuất và đưa về /login.
+   */
+  authorized: <T>(call: (accessToken: string) => Promise<T>) => Promise<T>
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null)
@@ -65,6 +72,36 @@ function writeSession(session: Session | null) {
   if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
   else localStorage.removeItem(STORAGE_KEY)
   emit()
+}
+
+// ---------------------------------------------------------------- refresh
+/**
+ * Một lần đổi token cho mọi request cùng gặp 401: refresh token chỉ dùng được một lần
+ * (BE thu hồi ngay khi đổi), gọi song song thì lần thứ hai sẽ bị từ chối.
+ */
+let refreshing: Promise<Session> | null = null
+
+function refreshSession(stale: Session): Promise<Session> {
+  refreshing ??= (async () => {
+    try {
+      const tokens = await authApi.refresh(stale.tokens.refresh_token)
+      const next = { tokens, user: stale.user }
+      writeSession(next)
+      return next
+    } catch (err) {
+      // Tab khác có thể vừa đổi token xong (và đã thu hồi cái mình đang cầm): dùng bản mới đó.
+      const current = parseSession(getSnapshot())
+      if (
+        current &&
+        current.tokens.refresh_token !== stale.tokens.refresh_token
+      )
+        return current
+      throw err
+    } finally {
+      refreshing = null
+    }
+  })()
+  return refreshing
 }
 
 function parseSession(raw: string | null | undefined): Session | null {
@@ -110,6 +147,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/login")
   }, [session, router])
 
+  const authorized = React.useCallback(
+    async <T,>(call: (accessToken: string) => Promise<T>): Promise<T> => {
+      // Đọc thẳng localStorage thay vì `session` của lần render này, để không dùng token cũ.
+      const current = parseSession(getSnapshot())
+      if (!current) throw new ApiError(401, "Bạn chưa đăng nhập.")
+      try {
+        return await call(current.tokens.access_token)
+      } catch (err) {
+        if (!(err instanceof ApiError) || err.status !== 401) throw err
+      }
+
+      let fresh: Session
+      try {
+        fresh = await refreshSession(current)
+      } catch {
+        try {
+          sessionStorage.setItem(SESSION_EXPIRED_KEY, String(Date.now()))
+        } catch {
+          // không lưu được thì trang đăng nhập chỉ không hiện câu báo
+        }
+        writeSession(null)
+        router.replace("/login")
+        throw new ApiError(
+          401,
+          "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại."
+        )
+      }
+      return call(fresh.tokens.access_token)
+    },
+    [router]
+  )
+
   const value = React.useMemo(
     () => ({
       user: session?.user ?? null,
@@ -118,8 +187,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       register,
       logout,
+      authorized,
     }),
-    [session, loading, login, register, logout]
+    [session, loading, login, register, logout, authorized]
   )
 
   return <AuthContext value={value}>{children}</AuthContext>

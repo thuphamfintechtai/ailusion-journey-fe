@@ -2,20 +2,28 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { LogOut } from "lucide-react"
+import { Loader2, LogOut, Menu, Plus, X } from "lucide-react"
 
 import { MessageInput } from "@/components/chat/message-input"
 import {
   MessageList,
   type DisplayMessage,
 } from "@/components/chat/message-list"
+import { Brand } from "@/components/brand"
 import { ThreadList } from "@/components/chat/thread-list"
 import { Button } from "@/components/ui/button"
 import { chat, streamChat, type ChatThread } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { peekPendingPrompt, takePendingPrompt } from "@/lib/pending-prompt"
+import {
+  forgetThreadTitle,
+  getThreadTitles,
+  saveThreadTitle,
+} from "@/lib/thread-titles"
+import { cn } from "@/lib/utils"
 
 export default function ChatPage() {
-  const { user, token, loading, logout } = useAuth()
+  const { user, token, loading, logout, authorized } = useAuth()
   const router = useRouter()
 
   const [threads, setThreads] = React.useState<ChatThread[]>([])
@@ -23,9 +31,14 @@ export default function ChatPage() {
   const [messages, setMessages] = React.useState<DisplayMessage[]>([])
   const [error, setError] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
+  const [sidebarOpen, setSidebarOpen] = React.useState(false)
+  // Đọc từ localStorage sau khi mount (server không có), cập nhật khi có hội thoại mới.
+  const [titles, setTitles] = React.useState<Record<string, string>>({})
 
   // Huỷ stream đang chạy khi bấm Dừng hoặc chuyển hội thoại.
   const abortRef = React.useRef<AbortController | null>(null)
+  // Hội thoại được mở gần nhất; bấm liền hai cái thì kết quả về sau của cái cũ bị bỏ.
+  const openingRef = React.useRef<string | null>(null)
 
   React.useEffect(() => {
     if (!loading && !token) router.replace("/login")
@@ -34,32 +47,59 @@ export default function ChatPage() {
   const refreshThreads = React.useCallback(async () => {
     if (!token) return
     try {
-      const page = await chat.threads(token)
+      const page = await authorized((t) => chat.threads(t))
       setThreads(page.items)
     } catch {
       // Danh sách hội thoại hỏng không nên chặn việc chat.
     }
-  }, [token])
+  }, [token, authorized])
+
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage chỉ đọc được ở client
+    setTitles(getThreadTitles())
+  }, [])
 
   // Nạp danh sách hội thoại lần đầu. Token nằm ở localStorage nên chỉ lấy được ở client.
   React.useEffect(() => {
     if (!token) return
     let cancelled = false
 
-    async function load(accessToken: string) {
+    async function load() {
       try {
-        const page = await chat.threads(accessToken)
+        const page = await authorized((t) => chat.threads(t))
         if (!cancelled) setThreads(page.items)
       } catch {
         // như trên: không chặn việc chat
       }
     }
 
-    void load(token)
+    void load()
     return () => {
       cancelled = true
     }
+  }, [token, authorized])
+
+  // Câu hỏi soạn ở trang chủ: gửi luôn khi vào màn chat. Hẹn sang tick sau và chỉ lấy ra
+  // khi thực sự gửi, để lần chạy effect thử của StrictMode không gửi hai lần hay huỷ mất.
+  const sendPendingPrompt = React.useEffectEvent(() => {
+    const prompt = takePendingPrompt()
+    if (prompt) void send(prompt)
+  })
+  React.useEffect(() => {
+    if (!token || !peekPendingPrompt()) return
+    const timer = window.setTimeout(sendPendingPrompt, 0)
+    return () => window.clearTimeout(timer)
   }, [token])
+
+  // Esc đóng ngăn hội thoại trên mobile.
+  React.useEffect(() => {
+    if (!sidebarOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSidebarOpen(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [sidebarOpen])
 
   // Dọn stream khi rời trang.
   React.useEffect(() => () => abortRef.current?.abort(), [])
@@ -67,17 +107,27 @@ export default function ChatPage() {
   async function openThread(id: string) {
     if (!token) return
     abortRef.current?.abort()
+    abortRef.current = null
     setBusy(false)
     setError(null)
     setThreadId(id)
+    setSidebarOpen(false)
+    openingRef.current = id
     try {
-      const history = await chat.history(token, id)
-      setMessages(
-        history.messages
-          .filter((m) => m.role === "human" || m.role === "ai")
-          .map((m) => ({ role: m.role as "human" | "ai", content: m.content }))
-      )
+      const history = await authorized((t) => chat.history(t, id))
+      if (openingRef.current !== id) return
+      const loaded = history.messages
+        .filter((m) => m.role === "human" || m.role === "ai")
+        .map((m) => ({ role: m.role as "human" | "ai", content: m.content }))
+      setMessages(loaded)
+      // Hội thoại tạo trước khi có tiêu đề (hoặc ở máy khác): lấy câu hỏi đầu tiên làm tiêu đề.
+      const first = loaded.find((m) => m.role === "human")
+      if (first) {
+        saveThreadTitle(id, first.content)
+        setTitles(getThreadTitles())
+      }
     } catch (err) {
+      if (openingRef.current !== id) return
       setMessages([])
       setError(err instanceof Error ? err.message : "Không tải được hội thoại")
     }
@@ -85,6 +135,9 @@ export default function ChatPage() {
 
   function newThread() {
     abortRef.current?.abort()
+    abortRef.current = null
+    openingRef.current = null
+    setSidebarOpen(false)
     setBusy(false)
     setError(null)
     setThreadId(null)
@@ -93,8 +146,10 @@ export default function ChatPage() {
 
   async function removeThread(id: string) {
     if (!token) return
+    if (!window.confirm("Xoá hội thoại này? Không thể hoàn tác.")) return
     try {
-      await chat.remove(token, id)
+      await authorized((t) => chat.remove(t, id))
+      forgetThreadTitle(id)
       if (id === threadId) newThread()
       await refreshThreads()
     } catch (err) {
@@ -102,7 +157,8 @@ export default function ChatPage() {
     }
   }
 
-  async function send(message: string) {
+  /** `echo: false` khi gửi lại một câu đã có sẵn trên màn hình (nút "Hỏi lại"). */
+  async function send(message: string, { echo = true } = {}) {
     if (!token) return
 
     const controller = new AbortController()
@@ -112,19 +168,34 @@ export default function ChatPage() {
     // Hiện ngay tin của người dùng + bong bóng rỗng để nhận stream.
     setMessages((prev) => [
       ...prev,
-      { role: "human", content: message },
+      ...(echo ? [{ role: "human" as const, content: message }] : []),
       { role: "ai", content: "", pending: true },
     ])
 
     let activeThread = threadId
     try {
-      for await (const event of streamChat(
-        token,
-        message,
-        threadId,
-        controller.signal
-      )) {
+      // Lỗi 401 chỉ lộ ra khi đọc sự kiện đầu tiên, nên mở stream và lấy sự kiện đầu
+      // bên trong `authorized` để token hết hạn thì được đổi và mở lại.
+      const stream = await authorized(async (accessToken) => {
+        const events = streamChat(
+          accessToken,
+          message,
+          threadId,
+          controller.signal
+        )
+        return { events, first: await events.next() }
+      })
+      for (
+        let step = stream.first;
+        !step.done;
+        step = await stream.events.next()
+      ) {
+        const event = step.value
         if (event.type === "start") {
+          if (!activeThread) {
+            saveThreadTitle(event.thread_id, message)
+            setTitles(getThreadTitles())
+          }
           activeThread = event.thread_id
           setThreadId(event.thread_id)
         } else if (event.type === "delta") {
@@ -134,77 +205,140 @@ export default function ChatPage() {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không gửi được tin nhắn")
+      // Bấm Dừng giữa chừng làm reader.read() ném AbortError — không phải lỗi thật.
+      if (!controller.signal.aborted)
+        setError(err instanceof Error ? err.message : "Không gửi được tin nhắn")
     } finally {
-      setMessages((prev) =>
-        prev.map((m, i) =>
-          i === prev.length - 1 ? { ...m, pending: false } : m
-        )
-      )
-      setBusy(false)
-      abortRef.current = null
+      // Đã chuyển sang hội thoại khác thì màn hình không còn là của stream này nữa.
+      if (abortRef.current === controller) {
+        abortRef.current = null
+        setBusy(false)
+        setMessages((prev) => {
+          const last = prev[prev.length - 1]
+          // Lỗi trước khi có chữ nào thì bỏ luôn bong bóng rỗng, chỉ để lại thông báo lỗi.
+          if (last?.role === "ai" && !last.content) return prev.slice(0, -1)
+          return prev.map((m, i) =>
+            i === prev.length - 1 ? { ...m, pending: false } : m
+          )
+        })
+      }
       if (activeThread) void refreshThreads()
     }
   }
 
   if (loading || !token) {
     return (
-      <main className="flex flex-1 items-center justify-center p-6 text-sm text-muted-foreground" />
+      <main className="flex flex-1 items-center justify-center p-6">
+        <Loader2
+          className="size-6 animate-spin text-muted-foreground"
+          aria-label="Đang tải"
+        />
+      </main>
     )
   }
 
+  const currentTitle = threadId ? titles[threadId] : null
+
   return (
-    <div className="flex min-h-0 flex-1">
-      <aside className="hidden w-64 shrink-0 border-r md:flex md:flex-col">
-        <ThreadList
-          threads={threads}
-          activeId={threadId}
-          onSelect={(id) => void openThread(id)}
-          onCreate={newThread}
-          onDelete={(id) => void removeThread(id)}
+    <div className="flex h-dvh min-h-0 flex-1 bg-muted/60">
+      {/* Mobile: danh sách chuyến đi trượt ra từ trái. */}
+      {sidebarOpen && (
+        <div
+          aria-hidden
+          className="fixed inset-0 z-40 animate-in bg-black/50 backdrop-blur-[2px] fade-in md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex w-72 shrink-0 flex-col bg-sea-deep text-white transition-transform duration-200 md:static md:translate-x-0",
+          sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+        )}
+      >
+        <div className="flex items-center justify-between gap-2 px-5 pt-5 pb-5">
+          <Brand tone="light" />
+          <button
+            type="button"
+            className="grid size-8 place-items-center rounded-md text-white/70 hover:bg-white/10 hover:text-white md:hidden"
+            onClick={() => setSidebarOpen(false)}
+            title="Đóng"
+          >
+            <X className="size-4" />
+            <span className="sr-only">Đóng danh sách</span>
+          </button>
+        </div>
+        <div className="min-h-0 flex-1">
+          <ThreadList
+            threads={threads}
+            titles={titles}
+            activeId={threadId}
+            onSelect={(id) => void openThread(id)}
+            onCreate={newThread}
+            onDelete={(id) => void removeThread(id)}
+          />
+        </div>
+        <UserCard
+          name={user?.full_name}
+          email={user?.email}
+          onLogout={() => void logout()}
         />
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between gap-2 border-b px-4 py-3">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">Trợ lý du lịch</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {user?.email}
+        <header className="flex h-16 shrink-0 items-center gap-3 border-b bg-background/80 px-3 backdrop-blur sm:px-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            onClick={() => setSidebarOpen(true)}
+            title="Các chuyến đi"
+          >
+            <Menu />
+            <span className="sr-only">Mở danh sách chuyến đi</span>
+          </Button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-[15px] font-bold">
+              {threadId ? (currentTitle ?? "Chuyến đi") : "Chuyến đi mới"}
+            </p>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="relative flex size-2">
+                <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
+                <span className="relative size-2 rounded-full bg-emerald-500" />
+              </span>
+              Trợ lý đang trực tuyến
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="md:hidden"
-              onClick={newThread}
-            >
-              Mới
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => void logout()}
-              title="Đăng xuất"
-            >
-              <LogOut className="size-4" />
-              <span className="sr-only">Đăng xuất</span>
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full"
+            onClick={newThread}
+            disabled={messages.length === 0}
+          >
+            <Plus />
+            <span className="max-sm:sr-only">Chuyến mới</span>
+          </Button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <MessageList messages={messages} />
+        <div data-scroll-container className="min-h-0 flex-1 overflow-y-auto">
+          <MessageList
+            messages={messages}
+            userName={user?.full_name}
+            busy={busy}
+            onSuggest={(prompt) => void send(prompt)}
+            onRetry={(prompt) => void send(prompt, { echo: false })}
+          />
         </div>
 
         {error && (
-          <p
-            role="alert"
-            className="mx-auto w-full max-w-3xl bg-destructive/10 px-4 py-2 text-sm text-destructive"
-          >
-            {error}
-          </p>
+          <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
+            <p
+              role="alert"
+              className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-2.5 text-sm text-destructive"
+            >
+              {error}
+            </p>
+          </div>
         )}
 
         <MessageInput
@@ -213,6 +347,47 @@ export default function ChatPage() {
           busy={busy}
         />
       </main>
+    </div>
+  )
+}
+
+function UserCard({
+  name,
+  email,
+  onLogout,
+}: {
+  name?: string | null
+  email?: string
+  onLogout: () => void
+}) {
+  const label = name?.trim() || email || ""
+  const initials =
+    label
+      .split(/\s+/)
+      .slice(-2)
+      .map((w) => w.charAt(0).toUpperCase())
+      .join("") || "?"
+  return (
+    <div className="m-3 flex items-center gap-3 rounded-xl bg-white/8 p-3">
+      <div
+        aria-hidden
+        className="grid size-9 shrink-0 place-items-center rounded-full bg-brand text-xs font-bold text-white"
+      >
+        {initials}
+      </div>
+      <div className="min-w-0 flex-1">
+        {name && <p className="truncate text-sm font-semibold">{name}</p>}
+        <p className="truncate text-xs text-white/60">{email}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onLogout}
+        title="Đăng xuất"
+        className="grid size-8 place-items-center rounded-md text-white/60 outline-none hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/40"
+      >
+        <LogOut className="size-4" />
+        <span className="sr-only">Đăng xuất</span>
+      </button>
     </div>
   )
 }

@@ -128,6 +128,13 @@ export const auth = {
       body: { email, password },
     }),
 
+  /** Đổi refresh token lấy cặp token mới; refresh token cũ bị thu hồi (rotation). */
+  refresh: (refreshToken: string) =>
+    request<TokenPair>("/auth/refresh", {
+      method: "POST",
+      body: { refresh_token: refreshToken },
+    }),
+
   logout: (refreshToken: string) =>
     request<void>("/auth/logout", {
       method: "POST",
@@ -135,7 +142,23 @@ export const auth = {
     }),
 
   me: (token: string) => request<User>("/users/me", { token }),
+
+  /** Luôn trả 202 dù email có tồn tại hay không, để không lộ ai đã đăng ký. */
+  forgotPassword: (email: string) =>
+    request<{ detail: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: { email },
+    }),
+
+  /** Token lấy từ link trong email. Sai, hết hạn hoặc đã dùng: 400 `invalid_reset_token`. */
+  resetPassword: (token: string, newPassword: string) =>
+    request<void>("/auth/reset-password", {
+      method: "POST",
+      body: { token, new_password: newPassword },
+    }),
 }
+
+export const INVALID_RESET_TOKEN = "invalid_reset_token"
 
 // ---------------------------------------------------------------- chat
 export const chat = {

@@ -1,19 +1,39 @@
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import {
+  Be_Vietnam_Pro,
+  Dancing_Script,
+  JetBrains_Mono,
+  Raleway,
+} from "next/font/google"
 
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/lib/auth"
 
 import "./globals.css"
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Raleway cho tiêu đề, Be Vietnam Pro cho chữ thường (dấu tiếng Việt rõ), Dancing Script cho vài
+// dòng chữ viết tay trên ảnh.
+const body = Be_Vietnam_Pro({
+  variable: "--font-body",
   subsets: ["latin", "vietnamese"],
+  weight: ["400", "500", "600", "700"],
 })
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const heading = Raleway({
+  variable: "--font-heading",
+  subsets: ["latin", "vietnamese"],
+  weight: ["600", "700", "800"],
+})
+
+const hand = Dancing_Script({
+  variable: "--font-hand",
+  subsets: ["latin", "vietnamese"],
+  weight: ["600", "700"],
+})
+
+const code = JetBrains_Mono({
+  variable: "--font-code",
+  subsets: ["latin", "vietnamese"],
 })
 
 export const metadata: Metadata = {
@@ -26,7 +46,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="vi"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${body.variable} ${heading.variable} ${hand.variable} ${code.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col font-sans">
         <ThemeProvider>

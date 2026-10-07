@@ -4,8 +4,15 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-heading);
+  --font-mono: var(--font-code);
+  --font-script: var(--font-hand);
+  --color-sea: var(--sea);
+  --color-sea-deep: var(--sea-deep);
+  --color-cta: var(--cta);
+  --color-cta-foreground: var(--cta-foreground);
+  --color-sun: var(--sun);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -43,73 +50,85 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Bảng màu lấy từ logo Ailusion: cyan → xanh chàm → tím. Nút chính dùng dải màu của logo
+   (utility bg-brand), nền tối dùng xanh navy. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #ffffff;
+  --foreground: #161a33;
+  --card: #ffffff;
+  --card-foreground: #161a33;
+  --popover: #ffffff;
+  --popover-foreground: #161a33;
+  --primary: #3a56c5;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f3ff;
+  --secondary-foreground: #2c3793;
+  --muted: #f4f6fb;
+  --muted-foreground: #5b6178;
+  --accent: #eceffe;
+  --accent-foreground: #2f3a99;
+  --destructive: #d93a4a;
+  --border: #e3e6f0;
+  --input: #d8dcea;
+  --ring: #4f6be0;
+  --chart-1: #14c6e0;
+  --chart-2: #3a56c5;
+  --chart-3: #8e44b5;
+  --chart-4: #29a7dc;
+  --chart-5: #6d2d93;
+  --radius: 0.5rem;
+  --sidebar: #121735;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #3a56c5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1d2450;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #262d5a;
+  --sidebar-ring: #4f6be0;
+  --sea: #14c6e0;
+  --sea-deep: #121735;
+  --cta: #7b3fbf;
+  --cta-foreground: #ffffff;
+  --sun: #8beaff;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #0c1024;
+  --foreground: #e8eaf6;
+  --card: #151a36;
+  --card-foreground: #e8eaf6;
+  --popover: #151a36;
+  --popover-foreground: #e8eaf6;
+  --primary: #6f86f0;
+  --primary-foreground: #0c1024;
+  --secondary: #1b2146;
+  --secondary-foreground: #d4d9ff;
+  --muted: #161b38;
+  --muted-foreground: #9aa1c0;
+  --accent: #202868;
+  --accent-foreground: #c9d1ff;
+  --destructive: #ff6b7a;
+  --border: #262d55;
+  --input: #2e3663;
+  --ring: #6f86f0;
+  --chart-1: #3fdcf2;
+  --chart-2: #6f86f0;
+  --chart-3: #b77ae0;
+  --chart-4: #4fbdea;
+  --chart-5: #9b5cc9;
+  --sidebar: #0a0d20;
+  --sidebar-foreground: #e8eaf6;
+  --sidebar-primary: #6f86f0;
+  --sidebar-primary-foreground: #0c1024;
+  --sidebar-accent: #1a2048;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #1f2650;
+  --sidebar-ring: #6f86f0;
+  --sea: #3fdcf2;
+  --sea-deep: #0a0d20;
+  --cta: #a46ee6;
+  --cta-foreground: #0c1024;
+  --sun: #8beaff;
 }
 
 @layer base {
@@ -119,4 +138,43 @@
   body {
     @apply bg-background text-foreground;
   }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
+/* Ảnh hero zoom và trôi chậm (Ken Burns). */
+@theme {
+  --animate-kenburns: kenburns 10s ease-out forwards;
+
+  @keyframes kenburns {
+    from {
+      transform: scale(1.02) translate(0, 0);
+    }
+    to {
+      transform: scale(1.12) translate(-1.5%, -1%);
+    }
+  }
+}
+
+/* Dải màu của logo cho nút chính và điểm nhấn. */
+@utility bg-brand {
+  background-image: linear-gradient(
+    120deg,
+    #14c6e0 0%,
+    #3a56c5 52%,
+    #8e44b5 100%
+  );
+}
+@utility text-brand {
+  background-image: linear-gradient(
+    100deg,
+    #14c6e0 0%,
+    #3a56c5 55%,
+    #8e44b5 100%
+  );
+  background-clip: text;
+  color: transparent;
 }

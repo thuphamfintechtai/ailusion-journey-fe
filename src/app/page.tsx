@@ -1,6 +1,27 @@
-import { redirect } from "next/navigation"
+import { Hero } from "@/components/home/hero"
+import {
+  Destinations,
+  HowItWorks,
+  SeasonPromo,
+  SiteFooter,
+  TravelStyles,
+  WhyUs,
+} from "@/components/home/sections"
+import { SiteNav } from "@/components/home/site-nav"
 
-export default function Home() {
-  // Vào thẳng màn chat; chưa đăng nhập thì /chat tự đẩy sang /login.
-  redirect("/chat")
+export default function HomePage() {
+  return (
+    <div className="flex min-h-dvh flex-1 flex-col">
+      <SiteNav />
+      <main className="flex-1">
+        <Hero />
+        <WhyUs />
+        <SeasonPromo />
+        <Destinations />
+        <TravelStyles />
+        <HowItWorks />
+      </main>
+      <SiteFooter />
+    </div>
+  )
 }
