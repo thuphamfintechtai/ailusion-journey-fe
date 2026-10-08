@@ -3,13 +3,18 @@
 import * as React from "react"
 import Image from "next/image"
 import {
+  AlertTriangle,
+  ArrowDown,
   ArrowUpRight,
+  CalendarPlus,
   Check,
   Copy,
   Hotel,
   RotateCcw,
   Route,
   UtensilsCrossed,
+  Wallet,
+  type LucideIcon,
 } from "lucide-react"
 
 import { BrandMark } from "@/components/brand"
@@ -22,6 +27,8 @@ export type DisplayMessage = {
   content: string
   /** Đang nhận stream — hiện con trỏ nhấp nháy ở cuối. */
   pending?: boolean
+  /** Trả lời thất bại: hiện thẻ lỗi kèm nút thử lại câu hỏi này. */
+  error?: { message: string; prompt: string }
 }
 
 type Props = {
@@ -30,21 +37,38 @@ type Props = {
   userName?: string | null
   /** Gửi một câu hỏi có sẵn (gợi ý ở màn trống, câu hỏi tiếp theo). */
   onSuggest: (prompt: string) => void
-  /** Gửi lại câu hỏi cuối khi nó chưa có câu trả lời (luồng trước bị ngắt giữa chừng). */
+  /** Gửi lại một câu hỏi chưa có câu trả lời (lỗi, hoặc luồng trước bị ngắt giữa chừng). */
   onRetry: (prompt: string) => void
   busy: boolean
 }
 
 /** Cách đáy trong khoảng này thì vẫn coi là đang "bám đáy" để tự cuộn theo stream. */
 const STICK_TO_BOTTOM_PX = 120
+/** Cách đáy quá khoảng này thì hiện nút "xuống cuối". */
+const SHOW_JUMP_PX = 480
 
-/** Hỏi tiếp sau một câu trả lời, để chỉnh lịch trình mà không phải gõ. */
-const FOLLOW_UPS = [
-  "Giảm chi phí xuống còn khoảng 2/3",
-  "Thêm 1 ngày nữa",
-  "Gợi ý chỗ ở cụ thể",
-  "Đổi sang lịch nhẹ nhàng hơn",
-  "Món nên ăn ở mỗi điểm",
+/** Hỏi tiếp sau một lịch trình, để chỉnh mà không phải gõ. */
+const FOLLOW_UPS: { icon: LucideIcon; label: string; prompt: string }[] = [
+  {
+    icon: Wallet,
+    label: "Tiết kiệm hơn",
+    prompt: "Giảm tổng chi phí xuống còn khoảng 2/3, giữ các điểm chính.",
+  },
+  {
+    icon: CalendarPlus,
+    label: "Thêm 1 ngày",
+    prompt: "Thêm 1 ngày nữa vào lịch trình.",
+  },
+  {
+    icon: Hotel,
+    label: "Gợi ý chỗ ở",
+    prompt: "Gợi ý chỗ ở cụ thể cho lịch trình này, kèm khu vực và mức giá.",
+  },
+  {
+    icon: UtensilsCrossed,
+    label: "Món nên ăn",
+    prompt: "Gợi ý món nên ăn và quán cụ thể ở từng điểm trong lịch trình.",
+  },
 ]
 
 export function MessageList({
@@ -55,6 +79,7 @@ export function MessageList({
   busy,
 }: Props) {
   const bottomRef = React.useRef<HTMLDivElement>(null)
+  const [farFromBottom, setFarFromBottom] = React.useState(false)
 
   // Tự cuộn xuống khi có nội dung mới, trừ khi người dùng đã cuộn lên đọc lại.
   React.useEffect(() => {
@@ -72,6 +97,20 @@ export function MessageList({
       bottom.scrollIntoView({ block: "end" })
   }, [messages])
 
+  React.useEffect(() => {
+    const scroller = bottomRef.current?.closest<HTMLElement>(
+      "[data-scroll-container]"
+    )
+    if (!scroller) return
+    const onScroll = () =>
+      setFarFromBottom(
+        scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight >
+          SHOW_JUMP_PX
+      )
+    scroller.addEventListener("scroll", onScroll, { passive: true })
+    return () => scroller.removeEventListener("scroll", onScroll)
+  }, [messages.length])
+
   if (messages.length === 0)
     return <EmptyState userName={userName} onSuggest={onSuggest} />
 
@@ -80,7 +119,7 @@ export function MessageList({
   const unanswered = !busy && last.role === "human" ? last.content : null
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pt-8 pb-6 sm:px-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-4 pt-8 pb-10 sm:px-6">
       {messages.map((message, index) =>
         message.role === "human" ? (
           // Danh sách chỉ nối thêm ở cuối, không sắp xếp lại, nên index đủ ổn định.
@@ -90,29 +129,46 @@ export function MessageList({
             key={index}
             message={message}
             followUps={
-              index === lastAi && !busy && !message.pending ? FOLLOW_UPS : []
+              index === lastAi &&
+              !busy &&
+              !message.pending &&
+              !message.error &&
+              looksLikePlan(message.content)
+                ? FOLLOW_UPS
+                : []
             }
             onSuggest={onSuggest}
+            onRetry={onRetry}
           />
         )
       )}
+
       {unanswered && (
-        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-sea/40 bg-card px-5 py-4 text-sm">
-          <span className="text-muted-foreground">
-            Câu hỏi này chưa có câu trả lời, có thể lần trước bị ngắt giữa
-            chừng.
-          </span>
-          <button
-            type="button"
-            onClick={() => onRetry(unanswered)}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/40"
-          >
-            <RotateCcw className="size-3.5" />
-            Hỏi lại
-          </button>
-        </div>
+        <ErrorCard
+          title="Câu hỏi này chưa có câu trả lời"
+          message="Có thể lần trước bị ngắt giữa chừng."
+          retryLabel="Hỏi lại"
+          onRetry={() => onRetry(unanswered)}
+        />
       )}
+
       <div ref={bottomRef} />
+
+      {farFromBottom && (
+        <button
+          type="button"
+          onClick={() =>
+            bottomRef.current?.scrollIntoView({
+              block: "end",
+              behavior: "smooth",
+            })
+          }
+          className="sticky bottom-4 mx-auto -mt-6 inline-flex animate-in items-center gap-1.5 rounded-full bg-foreground/90 px-3.5 py-2 text-xs font-semibold text-background shadow-lg backdrop-blur outline-none fade-in slide-in-from-bottom-2 hover:bg-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40"
+        >
+          <ArrowDown className="size-3.5" />
+          Xuống cuối
+        </button>
+      )}
     </div>
   )
 }
@@ -120,7 +176,7 @@ export function MessageList({
 function UserMessage({ content }: { content: string }) {
   return (
     <div className="flex animate-in justify-end duration-300 fade-in slide-in-from-bottom-2">
-      <div className="max-w-[85%] rounded-3xl rounded-br-lg bg-gradient-to-br from-sea to-primary px-5 py-3 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-white shadow-md shadow-primary/20">
+      <div className="max-w-[80%] rounded-[22px] rounded-br-md bg-brand px-5 py-3 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-white shadow-lg shadow-primary/20">
         {content}
       </div>
     </div>
@@ -131,55 +187,115 @@ function AssistantMessage({
   message,
   followUps,
   onSuggest,
+  onRetry,
 }: {
   message: DisplayMessage
-  followUps: string[]
+  followUps: typeof FOLLOW_UPS
   onSuggest: (prompt: string) => void
+  onRetry: (prompt: string) => void
 }) {
   const isWaiting = message.pending && !message.content
+  const error = message.error
 
   return (
     <div className="flex animate-in gap-3 duration-300 fade-in slide-in-from-bottom-2 sm:gap-4">
-      <BrandMark framed className="mt-1" />
-      <div className="grid min-w-0 flex-1 gap-3">
-        <div className="flex items-baseline gap-2">
+      <BrandMark framed className="mt-0.5 hidden sm:grid" />
+      <div className="grid min-w-0 flex-1 gap-2.5">
+        <div className="flex items-center gap-2">
+          <BrandMark framed className="size-6 sm:hidden" />
           <span className="font-display text-sm font-bold">Ailusion</span>
-          <span className="text-xs text-muted-foreground">Trợ lý du lịch</span>
+          <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold tracking-wide text-accent-foreground uppercase">
+            Trợ lý du lịch
+          </span>
         </div>
 
-        <div className="rounded-2xl rounded-tl-md border bg-card px-5 py-4 text-[15px] leading-relaxed break-words text-card-foreground shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-12px_rgb(10_79_85/0.18)] sm:px-6 sm:py-5">
-          {isWaiting ? (
-            <Thinking />
-          ) : (
-            <>
-              <Markdown>{message.content}</Markdown>
-              {message.pending && (
-                <span className="ml-0.5 inline-block h-4 w-[3px] animate-pulse rounded-full bg-sea align-middle" />
-              )}
-            </>
-          )}
-        </div>
+        {error ? (
+          <ErrorCard
+            title="Trợ lý chưa trả lời được"
+            message={error.message}
+            retryLabel="Thử lại"
+            onRetry={() => onRetry(error.prompt)}
+          />
+        ) : (
+          <div className="rounded-2xl bg-card px-5 py-4 text-[15px] leading-[1.7] break-words text-card-foreground shadow-[0_1px_2px_rgb(18_23_53/0.05),0_12px_32px_-16px_rgb(18_23_53/0.18)] ring-1 ring-border/70 sm:px-7 sm:py-6">
+            {isWaiting ? (
+              <Thinking />
+            ) : (
+              <>
+                <Markdown>{message.content}</Markdown>
+                {message.pending && (
+                  <span className="ml-0.5 inline-block h-4 w-[3px] animate-pulse rounded-full bg-primary align-middle" />
+                )}
+              </>
+            )}
+          </div>
+        )}
 
-        {!message.pending && message.content && (
-          <CopyButton text={message.content} />
+        {!message.pending && message.content && !error && (
+          <div className="flex items-center gap-1">
+            <CopyButton text={message.content} />
+          </div>
         )}
 
         {followUps.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {followUps.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                onClick={() => onSuggest(prompt)}
-                className="inline-flex items-center gap-1 rounded-full border border-sea/30 bg-accent/60 px-3.5 py-1.5 text-[13px] font-medium text-accent-foreground transition-colors outline-none hover:border-sea hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/40"
-              >
-                {prompt}
-                <ArrowUpRight className="size-3.5 opacity-60" />
-              </button>
-            ))}
+          <div className="mt-1 grid gap-2">
+            <p className="text-xs font-semibold text-muted-foreground">
+              Chỉnh tiếp lịch trình
+            </p>
+            <div className="-mx-1 flex [scrollbar-width:none] gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">
+              {followUps.map(({ icon: Icon, label, prompt }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => onSuggest(prompt)}
+                  title={prompt}
+                  className="group inline-flex shrink-0 items-center gap-2 rounded-xl bg-card px-3.5 py-2 text-[13px] font-semibold text-foreground shadow-xs ring-1 ring-border transition-all outline-none hover:-translate-y-0.5 hover:shadow-md hover:ring-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/40"
+                >
+                  <span className="grid size-6 place-items-center rounded-lg bg-accent text-primary transition-colors group-hover:bg-brand group-hover:text-white">
+                    <Icon className="size-3.5" />
+                  </span>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function ErrorCard({
+  title,
+  message,
+  retryLabel,
+  onRetry,
+}: {
+  title: string
+  message: string
+  retryLabel: string
+  onRetry: () => void
+}) {
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center gap-3 rounded-2xl border border-destructive/20 bg-destructive/5 px-5 py-4 text-sm"
+    >
+      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-destructive/10 text-destructive">
+        <AlertTriangle className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">{title}</p>
+        <p className="text-muted-foreground">{message}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background outline-none hover:bg-foreground/90 focus-visible:ring-[3px] focus-visible:ring-ring/40"
+      >
+        <RotateCcw className="size-3.5" />
+        {retryLabel}
+      </button>
     </div>
   )
 }
@@ -285,7 +401,7 @@ function EmptyState({
   userName?: string | null
   onSuggest: (prompt: string) => void
 }) {
-  const firstName = userName?.trim().split(/\s+/).pop()
+  const name = greetingName(userName)
   const banner = PHOTOS.halong
 
   return (
@@ -301,14 +417,15 @@ function EmptyState({
         />
         <div className="absolute inset-0 -z-10 bg-gradient-to-r from-sea-deep/90 via-sea-deep/60 to-sea-deep/10" />
         <p className="font-script text-2xl text-sun">
-          {firstName ? `Xin chào, ${firstName}!` : "Xin chào!"}
+          {name ? `Xin chào, ${name}!` : "Xin chào!"}
         </p>
         <h1 className="mt-2 max-w-lg font-display text-3xl leading-tight font-extrabold sm:text-4xl">
           Chuyến tiếp theo của bạn sẽ là đâu?
         </h1>
         <p className="mt-3 max-w-md text-white/85">
-          Kể điểm đến, số ngày, ai đi cùng và ngân sách. Trợ lý sẽ lên lịch
-          trình từng buổi cho bạn.
+          Kể điểm đến, số ngày, ai đi cùng và ngân sách, hoặc bấm{" "}
+          <b className="font-semibold text-white">Điền thông tin chuyến đi</b>{" "}
+          cạnh ô chat. Trợ lý sẽ lên lịch trình từng buổi cho bạn.
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
           {INTENTS.map(({ icon: Icon, label, prompt }) => (
@@ -371,4 +488,26 @@ function EmptyState({
       </div>
     </div>
   )
+}
+
+/**
+ * Tên để chào. Tên tiếng Việt đặt tên gọi ở cuối ("Nguyễn Văn An" -> "An"), nhưng từ cuối
+ * không phải chữ (vd. "Test 2") thì chào bằng cả họ tên cho khỏi kỳ.
+ */
+function greetingName(fullName?: string | null): string | null {
+  const words = fullName?.trim().split(/\s+/).filter(Boolean) ?? []
+  const last = words[words.length - 1]
+  if (!last) return null
+  return /^\p{L}+$/u.test(last) ? last : words.join(" ")
+}
+
+/**
+ * Câu trả lời có phải một lịch trình không (để hiện các nút "chỉnh tiếp"). Câu trợ lý hỏi
+ * lại thông tin còn thiếu thì không: chưa có gì để chỉnh.
+ */
+function looksLikePlan(content: string): boolean {
+  if (/(?:^|\n)\s*(?:#+\s*|\*\*)?\s*(?:ngày|day)\s*\d/i.test(content))
+    return true
+  const bullets = content.match(/^\s*(?:[-*+]|\d+\.)\s+/gm)?.length ?? 0
+  return bullets >= 4 && content.length > 500
 }

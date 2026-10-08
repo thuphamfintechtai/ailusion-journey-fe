@@ -8,6 +8,35 @@
   --font-display: var(--font-heading);
   --font-mono: var(--font-code);
   --font-script: var(--font-hand);
+  --font-num: var(--font-numeric);
+  /* Trang lộ trình (/plan): bảng màu "sổ tay du lịch" của prototype Hành Trình AI. */
+  --color-trip-paper: var(--trip-paper);
+  --color-trip-sheet: var(--trip-sheet);
+  --color-trip-sheet-2: var(--trip-sheet-2);
+  --color-trip-ink: var(--trip-ink);
+  --color-trip-ink-2: var(--trip-ink-2);
+  --color-trip-ink-3: var(--trip-ink-3);
+  --color-trip-line: var(--trip-line);
+  --color-trip-line-2: var(--trip-line-2);
+  --color-trip-on-ink: var(--trip-on-ink);
+  --color-trip-seal: var(--trip-seal);
+  --color-trip-seal-bg: var(--trip-seal-bg);
+  --color-trip-jade: var(--trip-jade);
+  --color-trip-jade-bg: var(--trip-jade-bg);
+  --color-trip-lotus: var(--trip-lotus);
+  --color-trip-lotus-bg: var(--trip-lotus-bg);
+  --color-trip-sky: var(--trip-sky);
+  --color-trip-sky-bg: var(--trip-sky-bg);
+  --color-trip-warn: var(--trip-warn);
+  --color-trip-warn-dot: var(--trip-warn-dot);
+  --color-trip-warn-bg: var(--trip-warn-bg);
+  --color-trip-canbang: var(--trip-canbang);
+  --color-trip-canbang-bg: var(--trip-canbang-bg);
+  --color-trip-stay: var(--trip-stay);
+  --color-trip-food: var(--trip-food);
+  --color-trip-tickets: var(--trip-tickets);
+  --color-trip-move: var(--trip-move);
+  --color-trip-inter: var(--trip-inter);
   --color-sea: var(--sea);
   --color-sea-deep: var(--sea-deep);
   --color-cta: var(--cta);
@@ -90,6 +119,33 @@
   --cta: #7b3fbf;
   --cta-foreground: #ffffff;
   --sun: #8beaff;
+  --trip-paper: #f1f2ec;
+  --trip-sheet: #fbfbf7;
+  --trip-sheet-2: #f4f5ef;
+  --trip-ink: #1d2640;
+  --trip-ink-2: #454d6b;
+  --trip-ink-3: #5f6682;
+  --trip-line: #dcded3;
+  --trip-line-2: #c6c9bc;
+  --trip-on-ink: #f7f7f2;
+  --trip-seal: #c3302a;
+  --trip-seal-bg: #fbece9;
+  --trip-jade: #1c7a61;
+  --trip-jade-bg: #e3f1ea;
+  --trip-lotus: #a93f74;
+  --trip-lotus-bg: #f6e8ef;
+  --trip-sky: #2f6fc9;
+  --trip-sky-bg: #e8effa;
+  --trip-warn: #8a5a00;
+  --trip-warn-dot: #c98a12;
+  --trip-warn-bg: #faf0d9;
+  --trip-canbang: #34438a;
+  --trip-canbang-bg: #e9ebf6;
+  --trip-stay: #34438a;
+  --trip-food: #c98a12;
+  --trip-tickets: #a93f74;
+  --trip-move: #2f6fc9;
+  --trip-inter: #6e7590;
 }
 
 .dark {
@@ -129,6 +185,33 @@
   --cta: #a46ee6;
   --cta-foreground: #0c1024;
   --sun: #8beaff;
+  --trip-paper: #12151f;
+  --trip-sheet: #1a1e2b;
+  --trip-sheet-2: #212636;
+  --trip-ink: #e7e9f0;
+  --trip-ink-2: #b7bccd;
+  --trip-ink-3: #9398ad;
+  --trip-line: #2b3143;
+  --trip-line-2: #3b4258;
+  --trip-on-ink: #12151f;
+  --trip-seal: #f0675f;
+  --trip-seal-bg: #3a1e1f;
+  --trip-jade: #4cc3a0;
+  --trip-jade-bg: #15302a;
+  --trip-lotus: #e58ab8;
+  --trip-lotus-bg: #36212d;
+  --trip-sky: #82acef;
+  --trip-sky-bg: #1c2a42;
+  --trip-warn: #e6b34a;
+  --trip-warn-dot: #e6b34a;
+  --trip-warn-bg: #362c16;
+  --trip-canbang: #9facf2;
+  --trip-canbang-bg: #232a4a;
+  --trip-stay: #7f8fe0;
+  --trip-food: #d9a23a;
+  --trip-tickets: #d56fa2;
+  --trip-move: #6e9de8;
+  --trip-inter: #8d93aa;
 }
 
 @layer base {
@@ -177,4 +260,23 @@
   );
   background-clip: text;
   color: transparent;
+}
+
+/* Tờ lịch xé trên trang lộ trình: dải gáy màu và hàng lỗ khoen. */
+@utility trip-cal-holes {
+  background: radial-gradient(
+      circle at 2.5px 2.5px,
+      var(--trip-paper) 2.4px,
+      transparent 2.6px
+    )
+    0 0 / 16px 5px repeat-x;
+}
+
+/* Nền bản đồ trên trang lộ trình: dịu màu cho hợp nền giấy; nền tối thì đảo màu. */
+.trip-tiles {
+  filter: saturate(0.35) brightness(1.03) contrast(0.92);
+}
+.dark .trip-tiles {
+  filter: invert(1) hue-rotate(180deg) saturate(0.3) brightness(0.85)
+    contrast(0.9);
 }

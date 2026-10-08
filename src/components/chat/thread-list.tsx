@@ -1,12 +1,15 @@
 "use client"
 
-import { MapPinned, Plus, Trash2 } from "lucide-react"
+import { MapPinned, Plus, RotateCcw, Trash2 } from "lucide-react"
 
 import type { ChatThread } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 type Props = {
   threads: ChatThread[]
+  /** "error": lần tải gần nhất thất bại (khác với chưa có chuyến nào). */
+  status: "loading" | "ready" | "error"
+  onReload: () => void
   titles: Record<string, string>
   activeId: string | null
   onSelect: (threadId: string) => void
@@ -16,6 +19,8 @@ type Props = {
 
 export function ThreadList({
   threads,
+  status,
+  onReload,
   titles,
   activeId,
   onSelect,
@@ -39,7 +44,37 @@ export function ThreadList({
         aria-label="Các chuyến đi"
         className="-mx-1 flex min-h-0 flex-1 [scrollbar-color:rgb(255_255_255/0.2)_transparent] flex-col gap-5 overflow-y-auto px-1"
       >
-        {threads.length === 0 && (
+        {threads.length === 0 && status === "loading" && (
+          <div className="grid gap-2 px-1 pt-1" aria-label="Đang tải">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="grid gap-1.5 rounded-lg px-2.5 py-2">
+                <span className="h-3.5 w-4/5 animate-pulse rounded bg-white/15" />
+                <span className="h-3 w-1/4 animate-pulse rounded bg-white/10" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {status === "error" && (
+          <div
+            role="alert"
+            className="mx-1 grid gap-2 rounded-xl bg-white/8 px-3 py-2.5 text-[13px] ring-1 ring-white/15"
+          >
+            <span className="font-semibold text-white/90">
+              Không tải được danh sách chuyến
+            </span>
+            <button
+              type="button"
+              onClick={onReload}
+              className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-white px-2.5 py-1 text-[13px] font-semibold text-sea-deep outline-none hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/60"
+            >
+              <RotateCcw className="size-3.5" />
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        {threads.length === 0 && status === "ready" && (
           <div className="mt-6 grid justify-items-center gap-2 px-4 text-center text-sm text-white/60">
             <MapPinned className="size-6 text-white/40" />
             Chưa có chuyến nào. Hỏi trợ lý một câu để bắt đầu.

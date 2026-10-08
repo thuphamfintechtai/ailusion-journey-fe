@@ -27,6 +27,10 @@ export default function ChatPage() {
   const router = useRouter()
 
   const [threads, setThreads] = React.useState<ChatThread[]>([])
+  // Trạng thái tải danh sách: phân biệt "chưa có chuyến" với "tải không được".
+  const [threadsStatus, setThreadsStatus] = React.useState<
+    "loading" | "ready" | "error"
+  >("loading")
   const [threadId, setThreadId] = React.useState<string | null>(null)
   const [messages, setMessages] = React.useState<DisplayMessage[]>([])
   const [error, setError] = React.useState<string | null>(null)
@@ -49,8 +53,10 @@ export default function ChatPage() {
     try {
       const page = await authorized((t) => chat.threads(t))
       setThreads(page.items)
+      setThreadsStatus("ready")
     } catch {
-      // Danh sách hội thoại hỏng không nên chặn việc chat.
+      // Danh sách hỏng không chặn việc chat; thanh bên hiện nút thử lại.
+      setThreadsStatus("error")
     }
   }, [token, authorized])
 
@@ -67,9 +73,12 @@ export default function ChatPage() {
     async function load() {
       try {
         const page = await authorized((t) => chat.threads(t))
-        if (!cancelled) setThreads(page.items)
+        if (cancelled) return
+        setThreads(page.items)
+        setThreadsStatus("ready")
       } catch {
         // như trên: không chặn việc chat
+        if (!cancelled) setThreadsStatus("error")
       }
     }
 
@@ -173,6 +182,8 @@ export default function ChatPage() {
     ])
 
     let activeThread = threadId
+    // Lỗi xảy ra trong lượt này; nếu chưa có chữ nào thì hiện thành thẻ lỗi trong hội thoại.
+    let failure: string | null = null
     try {
       // Lỗi 401 chỉ lộ ra khi đọc sự kiện đầu tiên, nên mở stream và lấy sự kiện đầu
       // bên trong `authorized` để token hết hạn thì được đổi và mở lại.
@@ -201,29 +212,58 @@ export default function ChatPage() {
         } else if (event.type === "delta") {
           appendToLast(setMessages, event.text)
         } else if (event.type === "error") {
-          setError(event.message)
+          failure = event.message
         }
       }
     } catch (err) {
       // Bấm Dừng giữa chừng làm reader.read() ném AbortError — không phải lỗi thật.
       if (!controller.signal.aborted)
-        setError(err instanceof Error ? err.message : "Không gửi được tin nhắn")
+        failure =
+          err instanceof Error ? err.message : "Không gửi được tin nhắn."
     } finally {
       // Đã chuyển sang hội thoại khác thì màn hình không còn là của stream này nữa.
       if (abortRef.current === controller) {
         abortRef.current = null
         setBusy(false)
+        const aborted = controller.signal.aborted
         setMessages((prev) => {
           const last = prev[prev.length - 1]
-          // Lỗi trước khi có chữ nào thì bỏ luôn bong bóng rỗng, chỉ để lại thông báo lỗi.
-          if (last?.role === "ai" && !last.content) return prev.slice(0, -1)
+          if (last?.role === "ai" && !last.content) {
+            // Bấm Dừng trước khi có chữ: bỏ bong bóng rỗng.
+            if (aborted) return prev.slice(0, -1)
+            // Stream kết thúc mà không có chữ nào (lỗi, hoặc kết nối đứt im lặng): báo
+            // ngay trong hội thoại, kèm nút thử lại đúng câu hỏi này.
+            return [
+              ...prev.slice(0, -1),
+              {
+                role: "ai",
+                content: "",
+                error: {
+                  message:
+                    failure ??
+                    "Kết nối bị ngắt trước khi có câu trả lời. Hãy thử lại.",
+                  prompt: message,
+                },
+              },
+            ]
+          }
           return prev.map((m, i) =>
             i === prev.length - 1 ? { ...m, pending: false } : m
           )
         })
+        // Đã có một phần câu trả lời rồi mới lỗi: giữ phần đó, báo lỗi ở dưới.
+        if (failure && !aborted) setError(failure)
       }
       if (activeThread) void refreshThreads()
     }
+  }
+
+  /** Thử lại một câu hỏi: dọn thẻ lỗi ở cuối rồi gửi lại, không lặp lại tin của người dùng. */
+  function retry(prompt: string) {
+    setMessages((prev) =>
+      prev[prev.length - 1]?.error ? prev.slice(0, -1) : prev
+    )
+    void send(prompt, { echo: false })
   }
 
   if (loading || !token) {
@@ -237,10 +277,13 @@ export default function ChatPage() {
     )
   }
 
-  const currentTitle = threadId ? titles[threadId] : null
+  const firstQuestion = messages.find((m) => m.role === "human")?.content
+  const currentTitle =
+    (threadId && titles[threadId]) || firstQuestion || "Chuyến đi mới"
+  const turnCount = messages.filter((m) => m.role === "human").length
 
   return (
-    <div className="flex h-dvh min-h-0 flex-1 bg-muted/60">
+    <div className="flex h-dvh min-h-0 flex-1 bg-background">
       {/* Mobile: danh sách chuyến đi trượt ra từ trái. */}
       {sidebarOpen && (
         <div
@@ -270,6 +313,11 @@ export default function ChatPage() {
         <div className="min-h-0 flex-1">
           <ThreadList
             threads={threads}
+            status={threadsStatus}
+            onReload={() => {
+              setThreadsStatus("loading")
+              void refreshThreads()
+            }}
             titles={titles}
             activeId={threadId}
             onSelect={(id) => void openThread(id)}
@@ -284,8 +332,8 @@ export default function ChatPage() {
         />
       </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center gap-3 border-b bg-background/80 px-3 backdrop-blur sm:px-6">
+      <main className="flex min-w-0 flex-1 flex-col bg-gradient-to-b from-accent/50 via-background to-muted/40">
+        <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border/60 bg-background/70 px-3 backdrop-blur-md sm:px-6">
           <Button
             variant="ghost"
             size="icon"
@@ -298,14 +346,32 @@ export default function ChatPage() {
           </Button>
           <div className="min-w-0 flex-1">
             <p className="truncate font-display text-[15px] font-bold">
-              {threadId ? (currentTitle ?? "Chuyến đi") : "Chuyến đi mới"}
+              {currentTitle}
             </p>
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="relative flex size-2">
-                <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
-                <span className="relative size-2 rounded-full bg-emerald-500" />
-              </span>
-              Trợ lý đang trực tuyến
+            <p
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+              aria-live="polite"
+            >
+              {busy ? (
+                <>
+                  <span className="flex gap-0.5" aria-hidden>
+                    {[0, 120, 240].map((d) => (
+                      <span
+                        key={d}
+                        className="size-1 animate-bounce rounded-full bg-primary"
+                        style={{ animationDelay: `${d}ms` }}
+                      />
+                    ))}
+                  </span>
+                  <span className="text-primary">
+                    Trợ lý đang soạn câu trả lời…
+                  </span>
+                </>
+              ) : turnCount > 0 ? (
+                `${turnCount} câu hỏi · Ailusion trợ lý du lịch`
+              ) : (
+                "Hỏi gì cũng được về chuyến đi của bạn"
+              )}
             </p>
           </div>
           <Button
@@ -326,7 +392,7 @@ export default function ChatPage() {
             userName={user?.full_name}
             busy={busy}
             onSuggest={(prompt) => void send(prompt)}
-            onRetry={(prompt) => void send(prompt, { echo: false })}
+            onRetry={retry}
           />
         </div>
 

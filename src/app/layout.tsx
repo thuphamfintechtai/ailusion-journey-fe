@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import {
+  Barlow_Condensed,
   Be_Vietnam_Pro,
   Dancing_Script,
   JetBrains_Mono,
@@ -31,6 +32,13 @@ const hand = Dancing_Script({
   weight: ["600", "700"],
 })
 
+// Số lớn trên trang lộ trình (giá, giờ, ngày trên tờ lịch) — chữ hẹp, dễ đọc khi in to.
+const numeric = Barlow_Condensed({
+  variable: "--font-numeric",
+  subsets: ["latin", "vietnamese"],
+  weight: ["500", "600"],
+})
+
 const code = JetBrains_Mono({
   variable: "--font-code",
   subsets: ["latin", "vietnamese"],
@@ -46,7 +54,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="vi"
       suppressHydrationWarning
-      className={`${body.variable} ${heading.variable} ${hand.variable} ${code.variable} h-full antialiased`}
+      className={`${body.variable} ${heading.variable} ${hand.variable} ${numeric.variable} ${code.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col font-sans">
         <ThemeProvider>

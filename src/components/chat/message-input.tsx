@@ -1,9 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { ArrowUp, Square } from "lucide-react"
+import { ArrowUp, ClipboardList, Square } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+
+import { TripFormSheet } from "./trip-form-sheet"
 
 type Props = {
   onSend: (message: string) => void
@@ -15,6 +17,7 @@ const MAX_HEIGHT_PX = 200
 
 export function MessageInput({ onSend, onStop, busy }: Props) {
   const [value, setValue] = React.useState("")
+  const [formOpen, setFormOpen] = React.useState(false)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
 
   // Ô nhập cao dần theo nội dung, tới một mức thì tự cuộn.
@@ -63,8 +66,20 @@ export function MessageInput({ onSend, onStop, busy }: Props) {
           className="block min-h-12 w-full resize-none bg-transparent px-4 pt-3 pb-1 text-base outline-none placeholder:text-muted-foreground/80 md:text-[15px]"
           aria-label="Nội dung tin nhắn"
         />
-        <div className="flex items-center justify-between gap-2 pr-1 pl-3">
-          <p className="hidden text-xs text-muted-foreground sm:block">
+        <div className="flex items-center justify-between gap-2 pr-1 pl-1.5">
+          <button
+            type="button"
+            onClick={() => setFormOpen(true)}
+            disabled={busy}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 text-[13px] font-semibold text-foreground transition-colors outline-none hover:border-primary/40 hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:opacity-50"
+          >
+            <ClipboardList className="size-4 text-primary" />
+            <span className="max-[380px]:sr-only">
+              Điền thông tin chuyến đi
+            </span>
+          </button>
+
+          <p className="ml-auto hidden text-xs text-muted-foreground lg:block">
             <kbd className="rounded border bg-muted px-1.5 py-0.5 font-sans text-[10px]">
               Enter
             </kbd>{" "}
@@ -79,7 +94,7 @@ export function MessageInput({ onSend, onStop, busy }: Props) {
               type="button"
               onClick={onStop}
               title="Dừng"
-              className="ml-auto inline-flex h-10 items-center gap-2 rounded-full bg-foreground px-4 text-sm font-semibold text-background transition-opacity outline-none hover:opacity-90 focus-visible:ring-[3px] focus-visible:ring-ring/40"
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground px-4 text-sm font-semibold text-background transition-opacity outline-none hover:opacity-90 focus-visible:ring-[3px] focus-visible:ring-ring/40"
             >
               <Square className="size-3 fill-current" />
               Dừng
@@ -90,7 +105,7 @@ export function MessageInput({ onSend, onStop, busy }: Props) {
               onClick={submit}
               disabled={!value.trim()}
               title="Gửi (Enter)"
-              className="ml-auto grid size-10 place-items-center rounded-full bg-brand text-white shadow-md shadow-primary/30 transition-[transform,opacity] outline-none hover:scale-105 focus-visible:ring-[3px] focus-visible:ring-primary/40 disabled:scale-100 disabled:bg-muted disabled:bg-none disabled:text-muted-foreground disabled:shadow-none"
+              className="grid size-10 place-items-center rounded-full bg-brand text-white shadow-md shadow-primary/30 transition-[transform,opacity] outline-none hover:scale-105 focus-visible:ring-[3px] focus-visible:ring-primary/40 disabled:scale-100 disabled:bg-muted disabled:bg-none disabled:text-muted-foreground disabled:shadow-none"
             >
               <ArrowUp className="size-5" />
               <span className="sr-only">Gửi</span>
@@ -98,6 +113,12 @@ export function MessageInput({ onSend, onStop, busy }: Props) {
           )}
         </div>
       </div>
+
+      <TripFormSheet
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        onSubmit={(prompt) => onSend(prompt)}
+      />
     </div>
   )
 }
