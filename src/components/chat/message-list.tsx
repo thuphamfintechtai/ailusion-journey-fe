@@ -404,11 +404,15 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-/** Chỉ để người dùng biết trợ lý đang làm việc; không phản ánh bước thật của backend. */
+/**
+ * Theo đúng thứ tự một lượt chat ở service LLM: đọc tin nhắn, ghi thông tin chuyến đi vào form
+ * (chỉ khi tin có thông tin chuyến đi), rồi soạn câu trả lời. Chuyển bước theo thời gian ước
+ * lượng — stream chat không gửi bước thật; lập lộ trình có khung tiến độ riêng (PlanTrace).
+ */
 const THINKING_HINTS = [
-  "Đang đọc yêu cầu của bạn",
-  "Đang chọn điểm đến phù hợp",
-  "Đang xếp lịch theo ngày",
+  "Đang đọc tin nhắn của bạn",
+  "Đang ghi thông tin chuyến đi",
+  "Đang soạn câu trả lời",
 ]
 
 function Thinking() {
