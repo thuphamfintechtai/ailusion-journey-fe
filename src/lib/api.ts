@@ -52,6 +52,8 @@ export type TripInfo = {
   adults: number | null
   children: number | null
   seniors: number | null
+  /** Đi cùng ai (solo | couple | friends | colleagues | family), dùng thẳng cho form lập lộ trình. */
+  group_type: string | null
   /** Tổng cả đoàn, triệu đồng. */
   budget_million: number | null
   budget_hard: boolean | null

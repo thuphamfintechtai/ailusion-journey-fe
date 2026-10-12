@@ -592,6 +592,7 @@ function emptyTrip(form: TripForm): TripInfo {
     adults: null,
     children: null,
     seniors: null,
+    group_type: form.group_type ?? null,
     budget_million: null,
     budget_hard: null,
     access: [],

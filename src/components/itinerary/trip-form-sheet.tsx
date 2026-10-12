@@ -148,6 +148,7 @@ function toTripInfo(f: TripForm): TripInfo {
     adults,
     children: (f.kids_under_6 ?? 0) + (f.kids_6_12 ?? 0),
     seniors: f.seniors_65 ?? 0,
+    group_type: f.group_type ?? null,
     budget_million: f.budget
       ? Math.round((f.budget / 1_000_000) * 10) / 10
       : null,
@@ -193,6 +194,12 @@ function fromTripInfo(
     )
     if (info.children || info.seniors) next.group_type = "family"
     else if (next.group_size === 1) next.group_type = "solo"
+    filled += 1
+  }
+  // Trợ lý đã hiểu "đi cùng ai" từ cuộc trò chuyện ("2 vợ chồng" -> cặp đôi): dùng luôn, để
+  // pipeline không hỏi lại câu H1.
+  if (info.group_type && GROUP_TYPES.some((g) => g.id === info.group_type)) {
+    next.group_type = info.group_type as TripForm["group_type"]
     filled += 1
   }
   if (info.budget_million) {
