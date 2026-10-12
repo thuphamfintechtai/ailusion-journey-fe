@@ -4,43 +4,24 @@
  * Kết quả pipeline lập lộ trình (bước 17) trong khung chat:
  * - status "need_info": các câu hỏi lại (bước 4), mỗi câu là nút bấm; bấm thì gửi lại form.
  * - status "ok": 3 phương án, mỗi cái nói rõ hơn 2 cái kia ở đâu, đang giả định gì; lịch theo giờ,
- *   bản đồ, cảnh báo, chỗ ở; vượt ngân sách thì hiện 2 lựa chọn (máy không tự cắt).
+ *   chi tiết phương án theo tab (lịch, bản đồ, chi phí, thời tiết, hành lý — xem plan-panel.tsx),
+ *   chỗ ở; vượt ngân sách thì hiện 2 lựa chọn (máy không tự cắt).
  */
 
 import * as React from "react"
-import dynamic from "next/dynamic"
-import {
-  AlertTriangle,
-  BedDouble,
-  Bus,
-  CircleHelp,
-  ExternalLink,
-  Info,
-  MapPin,
-  Quote,
-  Utensils,
-} from "lucide-react"
+import { AlertTriangle, BedDouble, CircleHelp, Info, Quote } from "lucide-react"
 
 import {
   isItineraryResult,
   money,
   trieu,
-  type ItineraryDay,
   type ItineraryResult,
   type TripForm,
 } from "@/lib/itinerary"
 import { cn } from "@/lib/utils"
 
-const DayMap = dynamic(() => import("./day-map"), {
-  ssr: false,
-})
-
-const STATUS: Record<ItineraryDay["status"], { label: string; cls: string }> = {
-  ok: { label: "Đi được", cls: "bg-trip-jade-bg text-trip-jade" },
-  risky: { label: "Sát giờ nếu ở lâu", cls: "bg-trip-warn-bg text-trip-warn" },
-  warn: { label: "Cần lưu ý", cls: "bg-trip-warn-bg text-trip-warn" },
-  fail: { label: "Không đi được", cls: "bg-trip-seal-bg text-trip-seal" },
-}
+import { PlanPanel } from "./plan-panel"
+import { trieuRange } from "./plan-shared"
 
 const FIELD_NAMES: Record<string, string> = {
   group_type: "đi cùng ai",
@@ -113,7 +94,7 @@ function Questions({
                     className={cn(
                       "min-h-[38px] rounded-full border px-3 text-sm",
                       on
-                        ? "border-trip-ink bg-trip-ink font-semibold text-trip-on-ink"
+                        ? "border-trip-fill bg-trip-fill font-semibold text-trip-on-fill"
                         : "border-trip-line-2 bg-trip-paper hover:border-trip-ink-3"
                     )}
                   >
@@ -138,7 +119,7 @@ function Questions({
           type="button"
           disabled={!done}
           onClick={() => onAnswer(Object.assign({}, ...Object.values(answers)))}
-          className="min-h-11 rounded-[10px] bg-trip-ink px-5 text-[15px] font-semibold text-trip-on-ink disabled:opacity-40"
+          className="min-h-11 rounded-[10px] bg-trip-fill px-5 text-[15px] font-semibold text-trip-on-fill disabled:opacity-40"
         >
           Lập lộ trình
         </button>
@@ -163,17 +144,15 @@ function Options({
 }) {
   const chosen = result.chosen ?? result.options[0]?.id
   const [selected, setSelected] = React.useState(chosen)
-  const [dayIndex, setDayIndex] = React.useState(0)
   const option =
     result.options.find((o) => o.id === selected) ?? result.options[0]
   if (!option) return null
-  const day = option.days[dayIndex] ?? option.days[0]
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
       {result.profile && (
         <div className="flex flex-wrap items-center gap-2 text-[13px]">
-          <span className="rounded-full bg-trip-ink px-2.5 py-0.5 font-semibold text-trip-on-ink">
+          <span className="rounded-full bg-trip-fill px-2.5 py-0.5 font-semibold text-trip-on-fill">
             Nhóm {result.profile.group} · {result.profile.group_name}
           </span>
           <span className="text-trip-ink-3">
@@ -215,6 +194,12 @@ function Options({
       >
         {result.options.map((o) => {
           const on = o.id === option.id
+          const cb = o.cost_breakdown
+          // Có khoảng "từ–đến" thì hiện khoảng, lộ trình cũ thì một con số.
+          const range =
+            cb?.total_min != null && cb.total_max != null
+              ? trieuRange(cb.total_min, cb.total_max)
+              : null
           return (
             <button
               key={o.id}
@@ -223,32 +208,42 @@ function Options({
               aria-selected={on}
               onClick={() => {
                 setSelected(o.id)
-                setDayIndex(0)
               }}
               className={cn(
                 "grid min-w-0 content-start gap-0.5 rounded-xl border p-2.5 text-left transition-colors",
                 on
-                  ? "border-2 border-trip-ink bg-trip-sheet"
+                  ? "border-2 border-trip-fill bg-trip-sheet"
                   : "border-trip-line bg-trip-sheet hover:bg-trip-sheet-2"
               )}
             >
               <span className="text-[13.5px] font-bold">{o.name}</span>
               {o.id === chosen && (
-                <span className="justify-self-start rounded-[5px] bg-trip-ink px-1.5 text-[11.5px] leading-[18px] font-bold text-trip-on-ink">
+                <span className="justify-self-start rounded-[5px] bg-trip-fill px-1.5 text-[11.5px] leading-[18px] font-bold text-trip-on-fill">
                   Đề xuất
                 </span>
               )}
-              <span className="font-num text-[22px] leading-tight font-semibold sm:text-[26px]">
-                {o.estimated_prices?.length ? (
+              <span
+                className={cn(
+                  "font-num leading-tight font-semibold",
+                  range
+                    ? "text-[17px] sm:text-[22px]"
+                    : "text-[22px] sm:text-[26px]"
+                )}
+              >
+                {range || o.estimated_prices?.length ? (
                   <span
                     className="mr-0.5 font-normal text-trip-ink-3"
-                    title={`Có giá ước (chưa có giá thật): ${o.estimated_prices.join(", ")}`}
+                    title={
+                      o.estimated_prices?.length
+                        ? `Có giá ước (chưa có giá thật): ${o.estimated_prices.join(", ")}`
+                        : "Khoảng ước, gồm cả phát sinh"
+                    }
                     aria-label="khoảng"
                   >
                     ≈
                   </span>
                 ) : null}
-                {trieu(o.total_cost)}
+                {range ?? trieu(o.total_cost)}
               </span>
               <span className="text-[11.5px] leading-snug text-trip-ink-3 sm:text-[12.5px]">
                 {o.better_at.join(" · ") || "lịch dự phòng"}
@@ -281,31 +276,7 @@ function Options({
         </div>
       )}
 
-      <div
-        role="tablist"
-        aria-label="Ngày"
-        className="flex gap-1.5 overflow-x-auto"
-      >
-        {option.days.map((d, i) => (
-          <button
-            key={d.plan_id}
-            type="button"
-            role="tab"
-            aria-selected={i === dayIndex}
-            onClick={() => setDayIndex(i)}
-            className={cn(
-              "shrink-0 rounded-[10px] border px-3 py-1.5 text-[13.5px] font-semibold",
-              i === dayIndex
-                ? "border-trip-ink bg-trip-ink text-trip-on-ink"
-                : "border-trip-line-2 bg-trip-sheet"
-            )}
-          >
-            Ngày {d.day} · {d.weekday}
-          </button>
-        ))}
-      </div>
-
-      {day && <DayView day={day} result={result} />}
+      <PlanPanel result={result} option={option} />
 
       {(result.guesses.length > 0 || result.understood.length > 0) && (
         <div className="grid gap-1.5 rounded-xl bg-trip-sheet px-3.5 py-3 text-[13.5px] text-trip-ink-2">
@@ -352,113 +323,5 @@ function Options({
           : ""}
       </p>
     </div>
-  )
-}
-
-function DayView({
-  day,
-  result,
-}: {
-  day: ItineraryDay
-  result: ItineraryResult
-}) {
-  const status = STATUS[day.status]
-  return (
-    <section className="grid gap-3 rounded-2xl border border-trip-line bg-trip-sheet p-3 sm:p-4">
-      <div className="flex flex-wrap items-center gap-2 text-[13px]">
-        <span
-          className={cn("rounded-full px-2.5 py-0.5 font-semibold", status.cls)}
-        >
-          {status.label}
-        </span>
-        {day.weather && <span className="text-trip-ink-3">{day.weather}</span>}
-        {day.metrics.ride_min != null && (
-          <span className="text-trip-ink-3">
-            ngồi xe {day.metrics.ride_min} phút
-          </span>
-        )}
-        {day.maps_url && (
-          <a
-            href={day.maps_url}
-            target="_blank"
-            rel="noopener"
-            className="ml-auto inline-flex items-center gap-1 font-semibold text-trip-sky"
-          >
-            Google Maps <ExternalLink className="size-3.5" />
-          </a>
-        )}
-      </div>
-      <DayMap day={day} stay={result.stay} />
-      <ol className="grid gap-0">
-        {day.items.map((item, i) => (
-          <li
-            key={`${item.start}-${i}`}
-            className="grid grid-cols-[52px_minmax(0,1fr)] gap-3 py-2"
-          >
-            <span className="font-num text-[17px] font-semibold">
-              {item.start}
-            </span>
-            <div className="grid gap-0.5">
-              <p className="flex items-center gap-1.5 text-[15px] font-semibold">
-                {item.type === "meal" ? (
-                  <Utensils className="size-4 text-trip-food" />
-                ) : item.type === "visit" ? (
-                  <MapPin className="size-4" />
-                ) : (
-                  <BedDouble className="size-4 text-trip-ink-3" />
-                )}
-                {item.name}
-                {item.type !== "start" &&
-                  item.type !== "back" &&
-                  item.end !== item.start && (
-                    <span className="font-num text-[13px] font-normal text-trip-ink-3">
-                      → {item.end}
-                    </span>
-                  )}
-              </p>
-              {(item.type === "visit" || item.type === "meal") && (
-                <p className="flex flex-wrap gap-x-3 text-[12.5px] text-trip-ink-3">
-                  {item.travel_min > 0 && (
-                    <span className="inline-flex items-center gap-1">
-                      <Bus className="size-3.5" />
-                      {item.travel_min} phút
-                    </span>
-                  )}
-                  <span>
-                    {item.price == null
-                      ? "chưa có giá"
-                      : item.price === 0
-                        ? "miễn phí"
-                        : `${money(item.price)} cả đoàn`}
-                  </span>
-                  {item.rating_floor != null && (
-                    <span>{item.rating_floor.toFixed(1)}★ tin được</span>
-                  )}
-                  {item.stay_by === "ước theo loại" && (
-                    <span>thời gian ở ước theo loại</span>
-                  )}
-                  {item.matches_purpose && (
-                    <span className="text-trip-jade">hợp mục đích</span>
-                  )}
-                  {item.wait_min > 0 && (
-                    <span>chờ mở cửa {item.wait_min} phút</span>
-                  )}
-                </p>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
-      {(day.issues.length > 0 || day.unchecked.length > 0) && (
-        <ul className="grid gap-1 rounded-xl bg-trip-warn-bg px-3 py-2 text-[13px] text-trip-ink-2">
-          {day.issues.map((x) => (
-            <li key={x}>⚠️ {x}</li>
-          ))}
-          {day.unchecked.map((x) => (
-            <li key={x}>• {x}</li>
-          ))}
-        </ul>
-      )}
-    </section>
   )
 }

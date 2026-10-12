@@ -19,6 +19,8 @@
   --color-trip-line: var(--trip-line);
   --color-trip-line-2: var(--trip-line-2);
   --color-trip-on-ink: var(--trip-on-ink);
+  --color-trip-fill: var(--trip-fill);
+  --color-trip-on-fill: var(--trip-on-fill);
   --color-trip-seal: var(--trip-seal);
   --color-trip-seal-bg: var(--trip-seal-bg);
   --color-trip-jade: var(--trip-jade);
@@ -119,15 +121,15 @@
   --cta: #7b3fbf;
   --cta-foreground: #ffffff;
   --sun: #8beaff;
-  --trip-paper: #f1f2ec;
-  --trip-sheet: #fbfbf7;
-  --trip-sheet-2: #f4f5ef;
-  --trip-ink: #1d2640;
-  --trip-ink-2: #454d6b;
-  --trip-ink-3: #5f6682;
-  --trip-line: #dcded3;
-  --trip-line-2: #c6c9bc;
-  --trip-on-ink: #f7f7f2;
+  --trip-paper: #f4f6fb;
+  --trip-sheet: #ffffff;
+  --trip-sheet-2: #eef1f9;
+  --trip-ink: #161a33;
+  --trip-ink-2: #3d4360;
+  --trip-ink-3: #5b6178;
+  --trip-line: #e3e6f0;
+  --trip-line-2: #cfd4e6;
+  --trip-on-ink: #ffffff;
   --trip-seal: #c3302a;
   --trip-seal-bg: #fbece9;
   --trip-jade: #1c7a61;
@@ -146,6 +148,9 @@
   --trip-tickets: #a93f74;
   --trip-move: #2f6fc9;
   --trip-inter: #6e7590;
+  /* Nền tô đậm (chip đang chọn, nhãn Đề xuất): màu chính của web. */
+  --trip-fill: var(--primary);
+  --trip-on-fill: var(--primary-foreground);
 }
 
 .dark {
@@ -185,15 +190,15 @@
   --cta: #a46ee6;
   --cta-foreground: #0c1024;
   --sun: #8beaff;
-  --trip-paper: #12151f;
-  --trip-sheet: #1a1e2b;
-  --trip-sheet-2: #212636;
-  --trip-ink: #e7e9f0;
-  --trip-ink-2: #b7bccd;
-  --trip-ink-3: #9398ad;
-  --trip-line: #2b3143;
-  --trip-line-2: #3b4258;
-  --trip-on-ink: #12151f;
+  --trip-paper: #11162e;
+  --trip-sheet: #151a36;
+  --trip-sheet-2: #1b2142;
+  --trip-ink: #e8eaf6;
+  --trip-ink-2: #c0c5de;
+  --trip-ink-3: #9aa1c0;
+  --trip-line: #262d55;
+  --trip-line-2: #333b6b;
+  --trip-on-ink: #0c1024;
   --trip-seal: #f0675f;
   --trip-seal-bg: #3a1e1f;
   --trip-jade: #4cc3a0;
@@ -212,6 +217,8 @@
   --trip-tickets: #d56fa2;
   --trip-move: #6e9de8;
   --trip-inter: #8d93aa;
+  --trip-fill: var(--primary);
+  --trip-on-fill: var(--primary-foreground);
 }
 
 @layer base {
@@ -270,13 +277,4 @@
       transparent 2.6px
     )
     0 0 / 16px 5px repeat-x;
-}
-
-/* Nền bản đồ trên trang lộ trình: dịu màu cho hợp nền giấy; nền tối thì đảo màu. */
-.trip-tiles {
-  filter: saturate(0.35) brightness(1.03) contrast(0.92);
-}
-.dark .trip-tiles {
-  filter: invert(1) hue-rotate(180deg) saturate(0.3) brightness(0.85)
-    contrast(0.9);
 }

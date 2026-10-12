@@ -163,7 +163,7 @@ export default function PlanPage() {
             <button
               type="button"
               onClick={() => setFormOpen(true)}
-              className="inline-flex min-h-11 w-fit items-center gap-2 rounded-xl bg-trip-ink px-5 text-[15px] font-semibold text-trip-on-ink"
+              className="inline-flex min-h-11 w-fit items-center gap-2 rounded-xl bg-trip-fill px-5 text-[15px] font-semibold text-trip-on-fill"
             >
               <Pencil className="size-4" />
               Điền thông tin chuyến đi

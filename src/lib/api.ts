@@ -396,6 +396,56 @@ export const plan = {
     }),
 }
 
+// ---------------------------------------------------------------- places
+/** Chi tiết một địa điểm (Google / SerpApi). Mọi trường có thể thiếu. */
+export type PlaceReview = {
+  rating?: number | null
+  date?: string | null
+  text?: string | null
+  images?: string[] | null
+}
+
+export type PlaceDetail = {
+  place_id?: string
+  name?: string | null
+  category?: string | null
+  address?: string | null
+  phone?: string | null
+  website?: string | null
+  maps_url?: string | null
+  lat?: number | null
+  lng?: number | null
+  rating?: number | null
+  reviews_count?: number | null
+  price?: string | number | null
+  /** `{thứ: giờ}` hoặc danh sách dòng, tuỳ nguồn. */
+  hours?: unknown
+  description?: string | null
+  /** Tiện ích / đặc điểm; nguồn có thể trả mảng hoặc object nhóm. */
+  attributes?: unknown
+  images?: string[] | null
+  reviews?: PlaceReview[] | null
+}
+
+export const places = {
+  /** `reviewPhotos`: lấy kèm ảnh trong đánh giá (gọi thêm Google, chậm hơn). */
+  get: (
+    token: string,
+    placeId: string,
+    destination?: string | null,
+    { reviewPhotos = false }: { reviewPhotos?: boolean } = {}
+  ) => {
+    const query = new URLSearchParams()
+    if (destination) query.set("destination", destination)
+    if (reviewPhotos) query.set("review_photos", "true")
+    const qs = query.toString()
+    return request<PlaceDetail>(
+      `/places/${encodeURIComponent(placeId)}${qs ? `?${qs}` : ""}`,
+      { token }
+    )
+  },
+}
+
 /** Mã lộ trình do trình duyệt tạo, để mở stream tiến độ ngay khi vừa gửi form. */
 export function newPlanThreadId(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(8))

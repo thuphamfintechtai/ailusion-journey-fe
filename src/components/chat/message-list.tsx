@@ -24,6 +24,7 @@ import type { PlanEvent } from "@/lib/api"
 import type { ItineraryResult, TripForm } from "@/lib/itinerary"
 
 import { DESTINATIONS, PHOTOS, photoUrl } from "@/lib/destinations"
+import { cn } from "@/lib/utils"
 
 import { Markdown } from "./markdown"
 
@@ -36,8 +37,7 @@ export type DisplayMessage = {
   error?: { message: string; prompt: string }
   /**
    * Lộ trình lập từ form ngay trong cuộc trò chuyện: đang chạy thì hiện tiến độ, xong thì
-   * hiện lộ trình đầy đủ (phương án, lịch theo giờ, bản đồ). Mở lại hội thoại thì chỉ còn
-   * bản chữ trong `content`.
+   * hiện lộ trình đầy đủ (phương án, lịch theo giờ, bản đồ) kèm các bước đã chạy.
    */
   plan?: {
     id: string
@@ -142,7 +142,9 @@ export function MessageList({
   const unanswered = !busy && last.role === "human" ? last.content : null
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-4 pt-8 pb-10 sm:px-6">
+    // Mọi tin nhắn bám một cột rộng: trợ lý sát mép trái, người dùng sát mép phải. Lộ trình dùng
+    // hết bề ngang; khung chữ giữ tối đa TEXT_MAX cho dòng không quá dài.
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-9 px-4 pt-8 pb-10 sm:px-6">
       {messages.map((message, index) =>
         message.role === "human" ? (
           // Danh sách chỉ nối thêm ở cuối, không sắp xếp lại, nên index đủ ổn định.
@@ -151,6 +153,11 @@ export function MessageList({
           <AssistantMessage
             key={index}
             message={message}
+            regenerate={
+              index === lastAi && !busy && !message.pending
+                ? regenerateOf(messages, index, onSuggest, onAnswerPlan)
+                : undefined
+            }
             followUps={
               index === lastAi &&
               !busy &&
@@ -169,12 +176,14 @@ export function MessageList({
       )}
 
       {unanswered && (
-        <ErrorCard
-          title="Câu hỏi này chưa có câu trả lời"
-          message="Có thể lần trước bị ngắt giữa chừng."
-          retryLabel="Hỏi lại"
-          onRetry={() => onRetry(unanswered)}
-        />
+        <div className={TEXT_MAX}>
+          <ErrorCard
+            title="Câu hỏi này chưa có câu trả lời"
+            message="Có thể lần trước bị ngắt giữa chừng."
+            retryLabel="Hỏi lại"
+            onRetry={() => onRetry(unanswered)}
+          />
+        </div>
       )}
 
       <div ref={bottomRef} />
@@ -198,10 +207,30 @@ export function MessageList({
   )
 }
 
+/**
+ * "Tạo lại" cho câu trả lời cuối: lộ trình thì lập lại bằng đúng form đó, câu chữ thì hỏi lại
+ * câu ngay trước. Câu hỏi được gửi lại như tin mới, khớp với lịch sử đã lưu.
+ */
+function regenerateOf(
+  messages: DisplayMessage[],
+  index: number,
+  onSuggest: (prompt: string) => void,
+  onAnswerPlan: (form: TripForm) => void
+): (() => void) | undefined {
+  const plan = messages[index].plan
+  if (plan) return () => onAnswerPlan(plan.form)
+  const asked = messages[index - 1]
+  if (asked?.role !== "human" || messages[index].error) return undefined
+  return () => onSuggest(asked.content)
+}
+
+/** Bề ngang tối đa của khung chữ, để dòng vừa mắt đọc. */
+const TEXT_MAX = "w-full max-w-3xl"
+
 function UserMessage({ content }: { content: string }) {
   return (
     <div className="flex animate-in justify-end duration-300 fade-in slide-in-from-bottom-2">
-      <div className="max-w-[80%] rounded-[22px] rounded-br-md bg-brand px-5 py-3 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-white shadow-lg shadow-primary/20">
+      <div className="max-w-[min(80%,42rem)] rounded-[22px] rounded-br-md bg-brand px-5 py-3 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-white shadow-lg shadow-primary/20">
         {content}
       </div>
     </div>
@@ -210,6 +239,7 @@ function UserMessage({ content }: { content: string }) {
 
 function AssistantMessage({
   message,
+  regenerate,
   followUps,
   onSuggest,
   onRetry,
@@ -217,6 +247,8 @@ function AssistantMessage({
   onAnswerPlan,
 }: {
   message: DisplayMessage
+  /** Có thì hiện nút "Tạo lại" (chỉ câu trả lời cuối, lúc không bận). */
+  regenerate?: () => void
   followUps: typeof FOLLOW_UPS
   onSuggest: (prompt: string) => void
   onRetry: (prompt: string) => void
@@ -227,9 +259,19 @@ function AssistantMessage({
   const error = message.error
 
   return (
-    <div className="flex animate-in gap-3 duration-300 fade-in slide-in-from-bottom-2 sm:gap-4">
+    <div
+      className={cn(
+        "w-full",
+        "flex animate-in gap-3 duration-300 fade-in slide-in-from-bottom-2 sm:gap-4"
+      )}
+    >
       <BrandMark framed className="mt-0.5 hidden sm:grid" />
-      <div className="grid min-w-0 flex-1 gap-2.5">
+      <div
+        className={cn(
+          "grid min-w-0 flex-1 gap-2.5",
+          !message.plan?.result && "max-w-3xl"
+        )}
+      >
         <div className="flex items-center gap-2">
           <BrandMark framed className="size-6 sm:hidden" />
           <span className="font-display text-sm font-bold">Ailusion</span>
@@ -269,6 +311,21 @@ function AssistantMessage({
         {!message.pending && message.content && !error && (
           <div className="flex items-center gap-1">
             <CopyButton text={message.content} />
+            {regenerate && (
+              <button
+                type="button"
+                onClick={regenerate}
+                title={
+                  message.plan
+                    ? "Lập lại lộ trình bằng form này"
+                    : "Hỏi lại câu trước"
+                }
+                className="inline-flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40"
+              >
+                <RotateCcw className="size-3.5" />
+                Tạo lại
+              </button>
+            )}
           </div>
         )}
 

@@ -49,6 +49,10 @@ export default function ChatPage() {
   const queryRef = React.useRef("")
 
   // Huỷ stream đang chạy khi bấm Dừng hoặc chuyển hội thoại.
+  const prefillCache = React.useRef<{
+    key: string
+    promise: Promise<TripState>
+  } | null>(null)
   const abortRef = React.useRef<AbortController | null>(null)
   // Hội thoại được mở gần nhất; bấm liền hai cái thì kết quả về sau của cái cũ bị bỏ.
   const openingRef = React.useRef<string | null>(null)
@@ -145,7 +149,7 @@ export default function ChatPage() {
               ? {
                   id: m.plan.result.thread_id,
                   form: m.plan.form,
-                  events: [],
+                  events: m.plan.result.trace ?? [],
                   result: m.plan.result,
                 }
               : undefined,
@@ -427,19 +431,34 @@ export default function ChatPage() {
   // Form "Điền thông tin chuyến đi" lấy form trợ lý đã điền: có sẵn từ lượt vừa trả lời
   // thì dùng luôn, không thì hỏi backend (đọc Postgres, không tốn lượt LLM). Đọc lại mỗi
   // khi có lượt hỏi mới.
-  const tripPrefill =
+  const prefillKey =
     threadId && turnCount > 0
+      ? `${threadId}:${turnCount}:${trip ? "event" : "fetch"}`
+      : null
+  const tripPrefill =
+    threadId && prefillKey
       ? {
-          key: `${threadId}:${turnCount}:${trip ? "event" : "fetch"}`,
-          load: () =>
-            trip
+          key: prefillKey,
+          // Nhớ lời gọi theo `key`: rê chuột vào nút đã bắt đầu tải, mở form thì dùng lại kết
+          // quả đó thay vì đợi thêm một lượt BE → LLM. Lỗi thì bỏ nhớ để lần sau gọi lại.
+          load: () => {
+            const cached = prefillCache.current
+            if (cached?.key === prefillKey) return cached.promise
+            const promise = trip
               ? Promise.resolve(trip)
-              : authorized((t) => chat.tripInfo(t, threadId)),
+              : authorized((t) => chat.tripInfo(t, threadId))
+            prefillCache.current = { key: prefillKey, promise }
+            promise.catch(() => {
+              if (prefillCache.current?.promise === promise)
+                prefillCache.current = null
+            })
+            return promise
+          },
         }
       : null
 
   return (
-    <div className="flex h-dvh min-h-0 flex-1 bg-background">
+    <div className="flex h-dvh shrink-0 overflow-hidden bg-background">
       {/* Mobile: danh sách chuyến đi trượt ra từ trái. */}
       {sidebarOpen && (
         <div

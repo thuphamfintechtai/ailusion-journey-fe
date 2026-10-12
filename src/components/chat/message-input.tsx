@@ -89,6 +89,9 @@ export function MessageInput({
           <button
             type="button"
             onClick={() => onFormOpenChange(true)}
+            // Tải sẵn thông tin điền form từ lúc rê chuột / chạm, để form mở ra là đủ ô.
+            onPointerEnter={() => void tripPrefill?.load().catch(() => {})}
+            onFocus={() => void tripPrefill?.load().catch(() => {})}
             disabled={busy}
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 text-[13px] font-semibold text-foreground transition-colors outline-none hover:border-primary/40 hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:opacity-50"
           >

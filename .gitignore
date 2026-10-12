@@ -34,3 +34,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Worker MapLibre, chép từ node_modules khi cài (scripts/copy-map-worker.mjs)
+/public/vendor/

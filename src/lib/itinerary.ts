@@ -69,7 +69,66 @@ export type ItineraryItem = {
   reviews: number
   stay_by: string | null
   matches_purpose: boolean | null
+  /** Ảnh địa điểm (Google / SerpApi). Lộ trình lưu từ bản cũ không có. */
+  image?: string | null
+  /** 1–2 câu giới thiệu địa điểm. */
+  summary?: string | null
+  /** Tối đa 3 lý do chọn điểm này. */
+  why?: string[]
+  /** Chặng từ điểm trước tới điểm này: phương tiện, quãng đường, tiền (VND, cả đoàn). */
+  travel_mode?: TravelMode | null
+  travel_km?: number | null
+  travel_cost?: number | null
+  /** Khoảng tiền ước (VND, cả đoàn); thiếu thì dùng `travel_cost` / `price`. */
+  travel_cost_min?: number | null
+  travel_cost_max?: number | null
+  price_min?: number | null
+  price_max?: number | null
+  /** Cùng chặng này nếu đi bằng phương tiện khác (phút). Lộ trình cũ không có. */
+  travel_alt?: TravelAlt[] | null
 }
+
+/** Phương tiện để so thời gian đi; không có xe buýt / phương tiện công cộng. */
+export type AltMode = "motorbike" | "car" | "taxi" | "walk"
+export type TravelAlt = { mode: AltMode; minutes: number }
+
+export type WeatherIcon = "sun" | "cloud" | "rain" | "storm" | "fog"
+
+/** Thời tiết một buổi trong ngày. */
+export type DaySession = {
+  part: "morning" | "afternoon" | "evening"
+  label: string
+  condition: string
+  rain_chance: number | null
+  icon: WeatherIcon
+}
+
+/** Tiền theo khoản (VND, cả đoàn). */
+export type CostSplit = {
+  stay: number
+  tickets: number
+  food: number
+  transport: number
+  total: number
+}
+
+/** Khoản phát sinh có thể gặp (gửi xe, tip, phụ thu…), ước theo khoảng. */
+export type ExtraItem = {
+  label: string
+  min: number
+  max: number
+  reason: string
+}
+
+/** Tổng ước theo khoảng "từ–đến" kèm phát sinh; lộ trình lưu từ bản cũ không có. */
+export type CostRange = {
+  extras?: number
+  total_min?: number
+  total_max?: number
+  extra_items?: ExtraItem[]
+}
+
+export type DayCost = CostSplit & CostRange
 
 export type ItineraryDay = {
   day: number
@@ -84,6 +143,20 @@ export type ItineraryDay = {
   items: ItineraryItem[]
   weather: string | null
   maps_url: string | null
+  /** Một dòng về phạm vi địa lý của ngày. */
+  area_note?: string | null
+  /** Ngày âm lịch, VD "10/9". */
+  lunar?: string | null
+  holiday?: string | null
+  crowd?: "low" | "medium" | "high" | null
+  crowd_note?: string | null
+  temp_min?: number | null
+  temp_max?: number | null
+  sessions?: DaySession[]
+  /** Chi phí của riêng ngày này. */
+  cost?: DayCost
+  /** Tổng phút ngồi xe cả ngày nếu đi bằng phương tiện khác. */
+  ride_alt?: TravelAlt[] | null
 }
 
 export type ItineraryOption = {
@@ -94,8 +167,36 @@ export type ItineraryOption = {
   total_cost: number | null
   /** Chỗ trong phương án đang dùng giá ước (chưa có giá thật). */
   estimated_prices?: string[]
+  /** Chi phí cả chuyến theo khoản, so với ngân sách. */
+  cost_breakdown?: DayCost & {
+    budget: number | null
+    per_person: number
+    per_person_min?: number
+    per_person_max?: number
+    /** Phát sinh chiếm bao nhiêu phần chi phí, VD 0.1 – 0.2. */
+    extras_pct_min?: number
+    extras_pct_max?: number
+    /** Vì sao cần để dành phát sinh: thuế, mưa làm giá xe tăng, hư xe, gửi xe, ăn vặt... */
+    extras_notes?: string[]
+    estimated: boolean
+    /** Tiền gọi xe cả chuyến nếu đi bằng từng hãng, rẻ trước (bảng giá các hãng). */
+    transport_options?: TransportOption[]
+  }
   days: ItineraryDay[]
 }
+
+export type TransportOption = {
+  brand: string
+  service: string
+  kind: "car" | "bike"
+  /** Số xe mỗi chặng (xe máy: mỗi khách một xe). */
+  vehicles: number
+  total: number
+}
+
+export type PackingGroup = "Giấy tờ" | "Quần áo" | "Sức khỏe" | "Thiết bị"
+
+export type PackingItem = { group: PackingGroup; item: string; reason: string }
 
 export type ItineraryQuestion = {
   id: string
@@ -152,6 +253,8 @@ export type ItineraryResult = {
   understood: { field: string; value: string; quote: string }[]
   notes: string[]
   festivals: string[]
+  /** Gợi ý hành lý theo thời tiết, lịch trình, thành phần đoàn. */
+  packing?: PackingItem[]
   stats: {
     llm_calls: number
     tool_calls: number
@@ -161,6 +264,15 @@ export type ItineraryResult = {
     cost_usd: number | null
     seconds: number
   }
+  /** Nhật ký từng bước của lượt chạy, lưu cùng kết quả: mở lại vẫn xem được "Quá trình xử lý". */
+  trace?: {
+    id: string
+    ts?: string
+    node: string
+    kind: string
+    text: string
+    data: Record<string, unknown>
+  }[]
 }
 
 /**

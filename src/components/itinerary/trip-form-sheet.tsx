@@ -264,8 +264,29 @@ function fromTripInfo(
 
 // ---------------------------------------------------------------- khối dựng
 
+// Mọi ô điền (ô chữ, ngày, giờ, bộ tăng giảm) cùng cao h-11, cùng nền và viền.
 const INPUT =
-  "h-11 w-full min-w-0 rounded-[10px] border border-trip-line-2 bg-trip-paper px-3 text-[15px] text-trip-ink outline-none placeholder:text-trip-ink-3 focus-visible:border-trip-ink-3 focus-visible:ring-[3px] focus-visible:ring-trip-sky/25"
+  "h-11 w-full min-w-0 rounded-[10px] border border-trip-line-2 bg-trip-sheet px-3 text-[15px] text-trip-ink outline-none placeholder:text-trip-ink-3 focus-visible:border-trip-fill focus-visible:ring-[3px] focus-visible:ring-trip-fill/20"
+
+/** Nhóm chip xếp lưới đều cột (ô rộng tối thiểu `min` px), không còn chip lẻ loi cuối dòng. */
+function ChipGrid({
+  min,
+  children,
+}: {
+  min: number
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      className="grid gap-2"
+      style={{
+        gridTemplateColumns: `repeat(auto-fill, minmax(${min}px, 1fr))`,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
 
 function Panel({
   title,
@@ -277,7 +298,7 @@ function Panel({
   children: React.ReactNode
 }) {
   return (
-    <section className="grid gap-4 rounded-2xl border border-trip-line bg-trip-sheet-2 p-4 sm:p-5">
+    <section className="grid gap-4 rounded-2xl border border-trip-line bg-trip-sheet p-4 shadow-xs sm:p-5">
       <header className="grid gap-0.5">
         <h3 className="text-[15.5px] font-bold text-trip-ink">{title}</h3>
         {hint && <p className="text-[13px] text-trip-ink-3">{hint}</p>}
@@ -331,10 +352,10 @@ function Chip({
       aria-pressed={on}
       onClick={onClick}
       className={cn(
-        "inline-flex min-h-[38px] items-center gap-1.5 rounded-full border px-3 text-sm transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-trip-sky/30",
+        "inline-flex h-10 items-center justify-center gap-1.5 rounded-full border px-3.5 text-sm whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-trip-fill/25",
         on
-          ? "border-trip-ink bg-trip-ink font-semibold text-trip-on-ink"
-          : "border-trip-line-2 bg-trip-sheet text-trip-ink hover:border-trip-ink-3"
+          ? "border-trip-fill bg-trip-fill font-semibold text-trip-on-fill"
+          : "border-trip-line-2 bg-trip-sheet text-trip-ink hover:border-trip-fill/50 hover:bg-trip-sheet-2"
       )}
     >
       {children}
@@ -359,10 +380,10 @@ function Stepper({
 }) {
   return (
     <Field label={label} htmlFor={id}>
-      <div className="inline-flex items-center justify-self-start rounded-[10px] border border-trip-line-2 bg-trip-paper">
+      <div className="flex h-11 w-full items-center justify-between rounded-[10px] border border-trip-line-2 bg-trip-sheet">
         <button
           type="button"
-          className="grid size-[42px] place-items-center rounded-[9px] text-trip-ink disabled:opacity-30"
+          className="grid h-full w-11 place-items-center rounded-[9px] text-trip-ink hover:bg-trip-sheet-2 disabled:opacity-30"
           disabled={value <= min}
           onClick={() => onChange(Math.max(min, value - 1))}
           aria-label={`Giảm ${label.toLowerCase()}`}
@@ -372,13 +393,13 @@ function Stepper({
         <output
           id={id}
           aria-live="polite"
-          className="min-w-[34px] text-center font-num text-[23px] font-semibold text-trip-ink"
+          className="min-w-[34px] text-center font-num text-[17px] font-semibold text-trip-ink"
         >
           {value}
         </output>
         <button
           type="button"
-          className="grid size-[42px] place-items-center rounded-[9px] text-trip-ink disabled:opacity-30"
+          className="grid h-full w-11 place-items-center rounded-[9px] text-trip-ink hover:bg-trip-sheet-2 disabled:opacity-30"
           disabled={value >= max}
           onClick={() => onChange(Math.min(max, value + 1))}
           aria-label={`Tăng ${label.toLowerCase()}`}
@@ -407,23 +428,26 @@ function TimeField({
   const isTime = !!value && /^\d{2}:\d{2}$/.test(value)
   return (
     <Field label={label} htmlFor={id}>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {buckets &&
-          ARRIVAL_BUCKETS.map((b) => (
-            <Chip
-              key={b.id}
-              on={value === b.id}
-              onClick={() => onChange(value === b.id ? null : b.id)}
-            >
-              {b.label}
-            </Chip>
-          ))}
+      <div className="grid gap-2">
+        {buckets && (
+          <div className="grid grid-cols-3 gap-2">
+            {ARRIVAL_BUCKETS.map((b) => (
+              <Chip
+                key={b.id}
+                on={value === b.id}
+                onClick={() => onChange(value === b.id ? null : b.id)}
+              >
+                {b.label}
+              </Chip>
+            ))}
+          </div>
+        )}
         <input
           id={id}
           type="time"
           value={isTime ? (value as string) : ""}
           onChange={(e) => onChange(e.target.value || null)}
-          className={cn(INPUT, "w-[124px]")}
+          className={INPUT}
         />
       </div>
     </Field>
@@ -516,10 +540,10 @@ export function TripFormSheet({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:animate-in data-[state=open]:fade-in" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:animate-in data-[state=open]:fade-in" />
         <Dialog.Content
           aria-describedby="trip-form-desc"
-          className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[22px] border border-trip-line bg-trip-sheet text-trip-ink shadow-2xl outline-none data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom sm:bottom-4 sm:rounded-[22px]"
+          className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[22px] border border-trip-line bg-trip-sheet text-trip-ink shadow-2xl will-change-transform outline-none data-[state=closed]:animate-out data-[state=closed]:duration-150 data-[state=closed]:slide-out-to-bottom data-[state=open]:animate-in data-[state=open]:duration-200 data-[state=open]:slide-in-from-bottom sm:bottom-4 sm:rounded-[22px]"
         >
           <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
             <header className="flex items-start justify-between gap-3 border-b border-trip-line px-5 pt-4 pb-3.5">
@@ -564,7 +588,7 @@ export function TripFormSheet({
                     className={INPUT}
                   />
                 </Field>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-2">
                   {PLACES.map((p) => (
                     <Chip
                       key={p}
@@ -627,8 +651,8 @@ export function TripFormSheet({
                     onChange={(v) => set("group_size", v)}
                   />
                 </div>
-                <Field label="Ngân sách">
-                  <div className="flex flex-wrap gap-1.5">
+                <Field label="Ngân sách (triệu đồng)">
+                  <ChipGrid min={52}>
                     {budgets.map((b) => (
                       <Chip
                         key={b}
@@ -640,16 +664,13 @@ export function TripFormSheet({
                           )
                         }
                       >
-                        <span className="font-num text-[16px] font-semibold">
-                          {b}
-                        </span>
-                        &nbsp;triệu
+                        <span className="font-num font-semibold">{b}</span>
                       </Chip>
                     ))}
-                  </div>
+                  </ChipGrid>
                 </Field>
                 {form.budget ? (
-                  <div className="flex flex-wrap gap-1.5">
+                  <ChipGrid min={160}>
                     {BUDGET_UNITS.map((u) => (
                       <Chip
                         key={u.id}
@@ -659,7 +680,7 @@ export function TripFormSheet({
                         {u.label}
                       </Chip>
                     ))}
-                  </div>
+                  </ChipGrid>
                 ) : null}
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Chỗ ở đã đặt (nếu có)" htmlFor="tf-stay">
@@ -674,7 +695,7 @@ export function TripFormSheet({
                     />
                   </Field>
                   <Field label="Đi lại tại chỗ bằng">
-                    <div className="flex flex-wrap gap-1.5">
+                    <ChipGrid min={110}>
                       {TRAVEL_MODES.map((m) => (
                         <Chip
                           key={m.id}
@@ -689,7 +710,7 @@ export function TripFormSheet({
                           {m.label}
                         </Chip>
                       ))}
-                    </div>
+                    </ChipGrid>
                   </Field>
                 </div>
               </Panel>
@@ -698,7 +719,7 @@ export function TripFormSheet({
                 title="Đi cùng ai"
                 hint="Để máy biết đoàn cần gì: chỗ cho trẻ, nhà vệ sinh, lối xe lăn, giờ về."
               >
-                <div className="flex flex-wrap gap-1.5">
+                <ChipGrid min={104}>
                   {GROUP_TYPES.map((g) => (
                     <Chip
                       key={g.id}
@@ -713,7 +734,7 @@ export function TripFormSheet({
                       {g.label}
                     </Chip>
                   ))}
-                </div>
+                </ChipGrid>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <Stepper
                     id="tf-k6"
@@ -749,7 +770,7 @@ export function TripFormSheet({
                   />
                 </div>
                 <Field label="Nhu cầu bắt buộc">
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {NEEDS.map((n) => (
                       <Chip
                         key={n.id}
@@ -877,7 +898,7 @@ export function TripFormSheet({
                 <label className="flex min-h-10 cursor-pointer items-center gap-2.5 text-[15px]">
                   <input
                     type="checkbox"
-                    className="size-5 accent-trip-ink"
+                    className="size-5 accent-trip-fill"
                     checked={!!form.night_out}
                     onChange={(e) => set("night_out", e.target.checked)}
                   />
@@ -889,7 +910,7 @@ export function TripFormSheet({
                 title="Mục đích"
                 hint="Chọn tối đa 2, theo thứ tự quan trọng."
               >
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-2">
                   {PURPOSES.map((p) => {
                     const idx = (form.purposes ?? []).indexOf(p.id)
                     return (
@@ -921,7 +942,7 @@ export function TripFormSheet({
                 </Field>
                 {(form.purposes ?? []).includes("adventure") && (
                   <Field label="Đi bộ được tầm nào">
-                    <div className="flex flex-wrap gap-1.5">
+                    <ChipGrid min={130}>
                       {WALKING.map((w) => (
                         <Chip
                           key={w.id}
@@ -936,7 +957,7 @@ export function TripFormSheet({
                           {w.label}
                         </Chip>
                       ))}
-                    </div>
+                    </ChipGrid>
                   </Field>
                 )}
               </Panel>
@@ -962,8 +983,8 @@ export function TripFormSheet({
                         className={cn(
                           "grid gap-0.5 rounded-xl text-left transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-trip-sky/30",
                           on
-                            ? "border-2 border-trip-ink bg-trip-sheet px-[12px] py-[10px]"
-                            : "border border-trip-line-2 bg-trip-paper px-[13px] py-[11px] hover:border-trip-ink-3"
+                            ? "border-2 border-trip-fill bg-trip-sheet px-[12px] py-[10px]"
+                            : "border border-trip-line-2 bg-trip-sheet px-[13px] py-[11px] hover:border-trip-fill/50"
                         )}
                       >
                         <b className="text-[15px]">{p.label}</b>
@@ -975,7 +996,7 @@ export function TripFormSheet({
                   })}
                 </div>
                 <Field label="Mức chi">
-                  <div className="flex flex-wrap gap-1.5">
+                  <ChipGrid min={150}>
                     {SPEND_STYLES.map((s) => (
                       <Chip
                         key={s.id}
@@ -985,7 +1006,7 @@ export function TripFormSheet({
                         {s.label}
                       </Chip>
                     ))}
-                  </div>
+                  </ChipGrid>
                 </Field>
               </Panel>
 
@@ -1034,7 +1055,7 @@ export function TripFormSheet({
                   <button
                     type="submit"
                     disabled={missing.length > 0}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-trip-ink px-5 text-[15px] font-semibold text-trip-on-ink outline-none hover:bg-trip-ink/90 focus-visible:ring-[3px] focus-visible:ring-trip-sky/30 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-trip-fill px-5 text-[15px] font-semibold text-trip-on-fill outline-none hover:bg-trip-fill/90 focus-visible:ring-[3px] focus-visible:ring-trip-sky/30 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Route className="size-4" />
                     Lập lộ trình
