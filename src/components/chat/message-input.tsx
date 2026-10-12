@@ -3,21 +3,40 @@
 import * as React from "react"
 import { ArrowUp, ClipboardList, Square } from "lucide-react"
 
+import type { TripInfo, TripState } from "@/lib/api"
+import type { TripForm } from "@/lib/itinerary"
 import { cn } from "@/lib/utils"
 
-import { TripFormSheet } from "./trip-form-sheet"
+import { TripFormSheet } from "@/components/itinerary/trip-form-sheet"
 
 type Props = {
   onSend: (message: string) => void
   onStop: () => void
   busy: boolean
+  /** Hội thoại đang mở, để form làm lại từ đầu khi đổi chuyến. */
+  threadId: string | null
+  /** Điền sẵn form từ cuộc trò chuyện; xem `TripFormSheet`. */
+  tripPrefill: { key: string; load: () => Promise<TripState> } | null
+  /** Form "Điền thông tin chuyến đi" đang mở. Trang chat giữ, để tự mở khi trợ lý báo. */
+  formOpen: boolean
+  onFormOpenChange: (open: boolean) => void
+  /** Người dùng bấm "Lập lộ trình" trong form. */
+  onPlan: (form: TripForm, info: TripInfo) => void
 }
 
 const MAX_HEIGHT_PX = 200
 
-export function MessageInput({ onSend, onStop, busy }: Props) {
+export function MessageInput({
+  onSend,
+  onStop,
+  busy,
+  threadId,
+  tripPrefill,
+  formOpen,
+  onFormOpenChange,
+  onPlan,
+}: Props) {
   const [value, setValue] = React.useState("")
-  const [formOpen, setFormOpen] = React.useState(false)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
 
   // Ô nhập cao dần theo nội dung, tới một mức thì tự cuộn.
@@ -69,7 +88,7 @@ export function MessageInput({ onSend, onStop, busy }: Props) {
         <div className="flex items-center justify-between gap-2 pr-1 pl-1.5">
           <button
             type="button"
-            onClick={() => setFormOpen(true)}
+            onClick={() => onFormOpenChange(true)}
             disabled={busy}
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 text-[13px] font-semibold text-foreground transition-colors outline-none hover:border-primary/40 hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:opacity-50"
           >
@@ -115,9 +134,11 @@ export function MessageInput({ onSend, onStop, busy }: Props) {
       </div>
 
       <TripFormSheet
+        key={threadId ?? "new"}
+        prefill={tripPrefill}
         open={formOpen}
-        onOpenChange={setFormOpen}
-        onSubmit={(prompt) => onSend(prompt)}
+        onOpenChange={onFormOpenChange}
+        onPlan={onPlan}
       />
     </div>
   )

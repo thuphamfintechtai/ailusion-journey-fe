@@ -12,14 +12,19 @@ import {
 import { Brand } from "@/components/brand"
 import { ThreadList } from "@/components/chat/thread-list"
 import { Button } from "@/components/ui/button"
-import { chat, streamChat, type ChatThread } from "@/lib/api"
+import {
+  ApiError,
+  chat,
+  newPlanThreadId,
+  streamChat,
+  streamPlanEvents,
+  type ChatThread,
+  type TripInfo,
+  type TripState,
+} from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { peekPendingPrompt, takePendingPrompt } from "@/lib/pending-prompt"
-import {
-  forgetThreadTitle,
-  getThreadTitles,
-  saveThreadTitle,
-} from "@/lib/thread-titles"
+import type { TripForm } from "@/lib/itinerary"
 import { cn } from "@/lib/utils"
 
 export default function ChatPage() {
@@ -36,8 +41,12 @@ export default function ChatPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
-  // Đọc từ localStorage sau khi mount (server không có), cập nhật khi có hội thoại mới.
-  const [titles, setTitles] = React.useState<Record<string, string>>({})
+  // Form chuyến đi trợ lý điền dần theo từng lượt (sự kiện "trip" cuối mỗi câu trả lời).
+  const [trip, setTrip] = React.useState<TripState | null>(null)
+  const [formOpen, setFormOpen] = React.useState(false)
+  // Ô tìm kiếm ở thanh bên; danh sách tải lại sau khi ngừng gõ một chút.
+  const [query, setQuery] = React.useState("")
+  const queryRef = React.useRef("")
 
   // Huỷ stream đang chạy khi bấm Dừng hoặc chuyển hội thoại.
   const abortRef = React.useRef<AbortController | null>(null)
@@ -51,7 +60,7 @@ export default function ChatPage() {
   const refreshThreads = React.useCallback(async () => {
     if (!token) return
     try {
-      const page = await authorized((t) => chat.threads(t))
+      const page = await authorized((t) => chat.threads(t, queryRef.current))
       setThreads(page.items)
       setThreadsStatus("ready")
     } catch {
@@ -60,19 +69,15 @@ export default function ChatPage() {
     }
   }, [token, authorized])
 
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage chỉ đọc được ở client
-    setTitles(getThreadTitles())
-  }, [])
-
-  // Nạp danh sách hội thoại lần đầu. Token nằm ở localStorage nên chỉ lấy được ở client.
+  // Nạp danh sách hội thoại; gõ tìm kiếm thì đợi 300ms rồi mới gọi lại.
   React.useEffect(() => {
     if (!token) return
     let cancelled = false
+    queryRef.current = query
 
     async function load() {
       try {
-        const page = await authorized((t) => chat.threads(t))
+        const page = await authorized((t) => chat.threads(t, query))
         if (cancelled) return
         setThreads(page.items)
         setThreadsStatus("ready")
@@ -82,11 +87,12 @@ export default function ChatPage() {
       }
     }
 
-    void load()
+    const timer = window.setTimeout(() => void load(), query ? 300 : 0)
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
     }
-  }, [token, authorized])
+  }, [token, authorized, query])
 
   // Câu hỏi soạn ở trang chủ: gửi luôn khi vào màn chat. Hẹn sang tick sau và chỉ lấy ra
   // khi thực sự gửi, để lần chạy effect thử của StrictMode không gửi hai lần hay huỷ mất.
@@ -120,6 +126,8 @@ export default function ChatPage() {
     setBusy(false)
     setError(null)
     setThreadId(id)
+    setTrip(null)
+    setFormOpen(false)
     setSidebarOpen(false)
     openingRef.current = id
     try {
@@ -127,14 +135,20 @@ export default function ChatPage() {
       if (openingRef.current !== id) return
       const loaded = history.messages
         .filter((m) => m.role === "human" || m.role === "ai")
-        .map((m) => ({ role: m.role as "human" | "ai", content: m.content }))
+        .map((m): DisplayMessage => ({
+          role: m.role as "human" | "ai",
+          content: m.content,
+          // Lộ trình đã lưu: dựng lại khung đầy đủ (3 phương án, lịch, bản đồ).
+          plan: m.plan
+            ? {
+                id: m.plan.result.thread_id,
+                form: m.plan.form,
+                events: [],
+                result: m.plan.result,
+              }
+            : undefined,
+        }))
       setMessages(loaded)
-      // Hội thoại tạo trước khi có tiêu đề (hoặc ở máy khác): lấy câu hỏi đầu tiên làm tiêu đề.
-      const first = loaded.find((m) => m.role === "human")
-      if (first) {
-        saveThreadTitle(id, first.content)
-        setTitles(getThreadTitles())
-      }
     } catch (err) {
       if (openingRef.current !== id) return
       setMessages([])
@@ -151,6 +165,8 @@ export default function ChatPage() {
     setError(null)
     setThreadId(null)
     setMessages([])
+    setTrip(null)
+    setFormOpen(false)
   }
 
   async function removeThread(id: string) {
@@ -158,7 +174,6 @@ export default function ChatPage() {
     if (!window.confirm("Xoá hội thoại này? Không thể hoàn tác.")) return
     try {
       await authorized((t) => chat.remove(t, id))
-      forgetThreadTitle(id)
       if (id === threadId) newThread()
       await refreshThreads()
     } catch (err) {
@@ -184,6 +199,8 @@ export default function ChatPage() {
     let activeThread = threadId
     // Lỗi xảy ra trong lượt này; nếu chưa có chữ nào thì hiện thành thẻ lỗi trong hội thoại.
     let failure: string | null = null
+    // Trợ lý báo form đã đủ và người dùng muốn lập lộ trình: mở form khi câu trả lời xong.
+    let openForm = false
     try {
       // Lỗi 401 chỉ lộ ra khi đọc sự kiện đầu tiên, nên mở stream và lấy sự kiện đầu
       // bên trong `authorized` để token hết hạn thì được đổi và mở lại.
@@ -203,14 +220,20 @@ export default function ChatPage() {
       ) {
         const event = step.value
         if (event.type === "start") {
-          if (!activeThread) {
-            saveThreadTitle(event.thread_id, message)
-            setTitles(getThreadTitles())
-          }
+          // Chuyến mới: hiện ngay trên thanh bên, không đợi stream xong mới tải lại danh sách.
+          if (!activeThread) addThreadOptimistically(event.thread_id, message)
           activeThread = event.thread_id
           setThreadId(event.thread_id)
         } else if (event.type === "delta") {
           appendToLast(setMessages, event.text)
+        } else if (event.type === "trip") {
+          setTrip({
+            info: event.info,
+            missing: event.missing,
+            wants_plan: event.wants_plan,
+            open_form: event.open_form,
+          })
+          openForm = event.open_form
         } else if (event.type === "error") {
           failure = event.message
         }
@@ -253,9 +276,117 @@ export default function ChatPage() {
         })
         // Đã có một phần câu trả lời rồi mới lỗi: giữ phần đó, báo lỗi ở dưới.
         if (failure && !aborted) setError(failure)
+        if (openForm && !aborted) setFormOpen(true)
       }
       if (activeThread) void refreshThreads()
     }
+  }
+
+  async function renameThread(id: string, title: string) {
+    const trimmed = title.trim()
+    const before = threads
+    if (!trimmed || before.find((t) => t.thread_id === id)?.title === trimmed)
+      return
+    setThreads((list) =>
+      list.map((t) => (t.thread_id === id ? { ...t, title: trimmed } : t))
+    )
+    try {
+      await authorized((t) => chat.rename(t, id, trimmed))
+    } catch (err) {
+      setThreads(before)
+      setError(err instanceof Error ? err.message : "Không đổi được tên")
+    }
+  }
+
+  /**
+   * Bấm "Lập lộ trình" trong form: lập lộ trình ngay trong cuộc trò chuyện. Tin của người
+   * dùng là form đã xác nhận; câu trả lời hiện tiến độ từng bước rồi lộ trình đầy đủ.
+   */
+  // Bản TripInfo của lượt lập lộ trình gần nhất: dùng lại khi trả lời câu hỏi lại.
+  const lastTripRef = React.useRef<TripInfo | null>(null)
+
+  async function startPlan(
+    planForm: TripForm,
+    info: TripInfo | null = lastTripRef.current
+  ) {
+    if (info) lastTripRef.current = info
+    if (!token || !threadId || busy) return
+    const chatThread = threadId
+    const id = newPlanThreadId()
+    const progress = new AbortController()
+    const updatePlan = (
+      change: (
+        plan: NonNullable<DisplayMessage["plan"]>
+      ) => Partial<NonNullable<DisplayMessage["plan"]>>,
+      content?: string
+    ) =>
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.plan?.id === id
+            ? {
+                ...m,
+                content: content ?? m.content,
+                plan: { ...m.plan, ...change(m.plan) },
+              }
+            : m
+        )
+      )
+
+    setError(null)
+    setBusy(true)
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "human",
+        content: `Lập lộ trình: ${planForm.destination}, ${planForm.start_date} → ${planForm.end_date}, ${planForm.group_size} người`,
+      },
+      { role: "ai", content: "", plan: { id, form: planForm, events: [] } },
+    ])
+
+    // Tiến độ chạy song song với request chính; lỗi ở đây không ảnh hưởng kết quả.
+    void (async () => {
+      for await (const event of streamPlanEvents(token, id, progress.signal))
+        updatePlan((plan) => ({ events: [...plan.events, event] }))
+    })()
+
+    try {
+      const reply = await authorized((t) =>
+        chat.plan(t, chatThread, planForm, id, info ?? emptyTrip(planForm))
+      )
+      // Tin của người dùng lấy đúng bản chữ đã lưu, để mở lại hội thoại thấy y như vậy.
+      // Còn câu hỏi lại (need_info) thì giữ chữ tạm, câu hỏi hiện ngay dưới.
+      if (reply.request_text)
+        setMessages((prev) => {
+          const at = prev.findIndex((m) => m.plan?.id === id)
+          return prev.map((m, i) =>
+            i === at - 1 && m.role === "human"
+              ? { ...m, content: reply.request_text }
+              : m
+          )
+        })
+      updatePlan(() => ({ result: reply.plan }), reply.reply || undefined)
+    } catch (err) {
+      updatePlan(() => ({
+        error:
+          err instanceof ApiError
+            ? err.message
+            : "Không lập được lộ trình, vui lòng thử lại.",
+      }))
+    } finally {
+      setBusy(false)
+      // Để stream kịp nhận sự kiện kết thúc rồi mới đóng.
+      setTimeout(() => progress.abort(), 1500)
+      void refreshThreads()
+    }
+  }
+
+  function addThreadOptimistically(id: string, firstMessage: string) {
+    const now = new Date().toISOString()
+    const title = firstMessage.replace(/\s+/g, " ").trim().slice(0, 80)
+    setThreads((list) => [
+      { thread_id: id, title, created_at: now, last_active_at: now },
+      ...list.filter((t) => t.thread_id !== id),
+    ])
   }
 
   /** Thử lại một câu hỏi: dọn thẻ lỗi ở cuối rồi gửi lại, không lặp lại tin của người dùng. */
@@ -279,8 +410,23 @@ export default function ChatPage() {
 
   const firstQuestion = messages.find((m) => m.role === "human")?.content
   const currentTitle =
-    (threadId && titles[threadId]) || firstQuestion || "Chuyến đi mới"
+    threads.find((t) => t.thread_id === threadId)?.title ||
+    firstQuestion ||
+    "Chuyến đi mới"
   const turnCount = messages.filter((m) => m.role === "human").length
+  // Form "Điền thông tin chuyến đi" lấy form trợ lý đã điền: có sẵn từ lượt vừa trả lời
+  // thì dùng luôn, không thì hỏi backend (đọc Postgres, không tốn lượt LLM). Đọc lại mỗi
+  // khi có lượt hỏi mới.
+  const tripPrefill =
+    threadId && turnCount > 0
+      ? {
+          key: `${threadId}:${turnCount}:${trip ? "event" : "fetch"}`,
+          load: () =>
+            trip
+              ? Promise.resolve(trip)
+              : authorized((t) => chat.tripInfo(t, threadId)),
+        }
+      : null
 
   return (
     <div className="flex h-dvh min-h-0 flex-1 bg-background">
@@ -318,7 +464,9 @@ export default function ChatPage() {
               setThreadsStatus("loading")
               void refreshThreads()
             }}
-            titles={titles}
+            query={query}
+            onQueryChange={setQuery}
+            onRename={(id, title) => void renameThread(id, title)}
             activeId={threadId}
             onSelect={(id) => void openThread(id)}
             onCreate={newThread}
@@ -393,6 +541,8 @@ export default function ChatPage() {
             busy={busy}
             onSuggest={(prompt) => void send(prompt)}
             onRetry={retry}
+            onOpenForm={() => setFormOpen(true)}
+            onAnswerPlan={(form) => void startPlan(form)}
           />
         </div>
 
@@ -411,10 +561,34 @@ export default function ChatPage() {
           onSend={(message) => void send(message)}
           onStop={() => abortRef.current?.abort()}
           busy={busy}
+          threadId={threadId}
+          tripPrefill={tripPrefill}
+          formOpen={formOpen}
+          onFormOpenChange={setFormOpen}
+          onPlan={startPlan}
         />
       </main>
     </div>
   )
+}
+
+/** TripInfo tối thiểu khi trả lời câu hỏi lại mà chưa có bản form chat (mở lại hội thoại cũ). */
+function emptyTrip(form: TripForm): TripInfo {
+  return {
+    persona: null,
+    destination: form.destination,
+    start_date: form.start_date,
+    days: null,
+    adults: null,
+    children: null,
+    seniors: null,
+    budget_million: null,
+    budget_hard: null,
+    access: [],
+    interests: [],
+    transport: null,
+    pace: null,
+  }
 }
 
 function UserCard({

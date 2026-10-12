@@ -38,9 +38,14 @@ export function SiteNav() {
         {/* Giữ chỗ trong lúc đọc phiên để nút không nhảy. */}
         <div className="flex min-w-40 items-center justify-end gap-2">
           {loading ? null : user ? (
-            <Button asChild>
-              <Link href="/chat">Mở trợ lý</Link>
-            </Button>
+            <>
+              <Button asChild variant="ghost" className="hidden sm:inline-flex">
+                <Link href="/plan">Lập lộ trình</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/chat">Mở trợ lý</Link>
+              </Button>
+            </>
           ) : (
             <>
               <Button asChild variant="ghost" className="hidden sm:inline-flex">

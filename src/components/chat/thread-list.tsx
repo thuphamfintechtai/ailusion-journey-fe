@@ -1,6 +1,16 @@
 "use client"
 
-import { MapPinned, Plus, RotateCcw, Trash2 } from "lucide-react"
+import * as React from "react"
+import {
+  MapPinned,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  SearchX,
+  Trash2,
+  X,
+} from "lucide-react"
 
 import type { ChatThread } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -10,7 +20,10 @@ type Props = {
   /** "error": lần tải gần nhất thất bại (khác với chưa có chuyến nào). */
   status: "loading" | "ready" | "error"
   onReload: () => void
-  titles: Record<string, string>
+  /** Ô tìm kiếm (tiêu đề và nội dung tin nhắn); trang chat gọi API theo giá trị này. */
+  query: string
+  onQueryChange: (query: string) => void
+  onRename: (threadId: string, title: string) => void
   activeId: string | null
   onSelect: (threadId: string) => void
   onCreate: () => void
@@ -21,13 +34,17 @@ export function ThreadList({
   threads,
   status,
   onReload,
-  titles,
+  query,
+  onQueryChange,
+  onRename,
   activeId,
   onSelect,
   onCreate,
   onDelete,
 }: Props) {
   const groups = groupByDay(threads)
+  const [editingId, setEditingId] = React.useState<string | null>(null)
+  const searching = query.trim() !== ""
 
   return (
     <div className="flex h-full flex-col gap-4 px-3 pb-3">
@@ -39,6 +56,29 @@ export function ThreadList({
         <Plus className="size-4" />
         Chuyến đi mới
       </button>
+
+      <div className="relative">
+        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-white/45" />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder="Tìm chuyến đi…"
+          aria-label="Tìm chuyến đi"
+          className="h-10 w-full rounded-xl bg-white/8 pr-9 pl-9 text-sm text-white ring-1 ring-white/12 outline-none placeholder:text-white/40 focus-visible:ring-2 focus-visible:ring-sea/70 [&::-webkit-search-cancel-button]:hidden"
+        />
+        {searching && (
+          <button
+            type="button"
+            onClick={() => onQueryChange("")}
+            title="Xoá tìm kiếm"
+            className="absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-white/55 outline-none hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/40"
+          >
+            <X className="size-3.5" />
+            <span className="sr-only">Xoá tìm kiếm</span>
+          </button>
+        )}
+      </div>
 
       <nav
         aria-label="Các chuyến đi"
@@ -76,8 +116,17 @@ export function ThreadList({
 
         {threads.length === 0 && status === "ready" && (
           <div className="mt-6 grid justify-items-center gap-2 px-4 text-center text-sm text-white/60">
-            <MapPinned className="size-6 text-white/40" />
-            Chưa có chuyến nào. Hỏi trợ lý một câu để bắt đầu.
+            {searching ? (
+              <>
+                <SearchX className="size-6 text-white/40" />
+                Không có chuyến nào khớp “{query.trim()}”.
+              </>
+            ) : (
+              <>
+                <MapPinned className="size-6 text-white/40" />
+                Chưa có chuyến nào. Hỏi trợ lý một câu để bắt đầu.
+              </>
+            )}
           </div>
         )}
 
@@ -88,7 +137,17 @@ export function ThreadList({
             </h3>
             {group.items.map((thread) => {
               const isActive = thread.thread_id === activeId
-              const title = titles[thread.thread_id]
+              if (editingId === thread.thread_id)
+                return (
+                  <RenameRow
+                    key={thread.thread_id}
+                    title={thread.title}
+                    onDone={(title) => {
+                      setEditingId(null)
+                      if (title !== null) onRename(thread.thread_id, title)
+                    }}
+                  />
+                )
               return (
                 <div
                   key={thread.thread_id}
@@ -112,13 +171,22 @@ export function ThreadList({
                         isActive ? "font-semibold text-white" : "text-white/85"
                       )}
                     >
-                      {title ?? "Chuyến đi"}
+                      {thread.title || "Chuyến đi"}
                     </span>
                     <span className="text-[11px] text-white/45 tabular-nums">
                       {formatTime(thread.last_active_at)}
                     </span>
                   </button>
 
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(thread.thread_id)}
+                    title="Đổi tên"
+                    className="grid size-7 shrink-0 place-items-center rounded-md text-white/50 opacity-0 transition-opacity outline-none group-hover:opacity-100 hover:bg-white/10 hover:text-white focus-visible:opacity-100 max-md:opacity-100"
+                  >
+                    <Pencil className="size-3.5" />
+                    <span className="sr-only">Đổi tên chuyến này</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => onDelete(thread.thread_id)}
@@ -134,6 +202,50 @@ export function ThreadList({
           </section>
         ))}
       </nav>
+    </div>
+  )
+}
+
+/** Ô sửa tên tại chỗ: Enter hoặc bấm ra ngoài để lưu, Esc để huỷ. */
+function RenameRow({
+  title,
+  onDone,
+}: {
+  title: string
+  /** `null` = huỷ. */
+  onDone: (title: string | null) => void
+}) {
+  const [value, setValue] = React.useState(title)
+  const doneRef = React.useRef(false)
+
+  function finish(result: string | null) {
+    if (doneRef.current) return
+    doneRef.current = true
+    const trimmed = result?.trim()
+    onDone(trimmed ? trimmed : null)
+  }
+
+  return (
+    <div className="rounded-lg bg-white/12 px-2 py-1.5 ring-2 ring-sea/70">
+      <input
+        autoFocus
+        value={value}
+        maxLength={200}
+        aria-label="Tên chuyến đi"
+        onChange={(e) => setValue(e.target.value)}
+        onFocus={(e) => e.currentTarget.select()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault()
+            finish(value)
+          } else if (e.key === "Escape") {
+            e.preventDefault()
+            finish(null)
+          }
+        }}
+        onBlur={() => finish(value)}
+        className="w-full bg-transparent px-1.5 py-0.5 text-sm text-white outline-none"
+      />
     </div>
   )
 }

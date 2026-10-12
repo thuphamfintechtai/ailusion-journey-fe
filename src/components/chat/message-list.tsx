@@ -18,6 +18,11 @@ import {
 } from "lucide-react"
 
 import { BrandMark } from "@/components/brand"
+import { ItineraryView } from "@/components/itinerary/itinerary-view"
+import { PlanTrace } from "@/components/itinerary/plan-trace"
+import type { PlanEvent } from "@/lib/api"
+import type { ItineraryResult, TripForm } from "@/lib/itinerary"
+
 import { DESTINATIONS, PHOTOS, photoUrl } from "@/lib/destinations"
 
 import { Markdown } from "./markdown"
@@ -29,6 +34,18 @@ export type DisplayMessage = {
   pending?: boolean
   /** Trả lời thất bại: hiện thẻ lỗi kèm nút thử lại câu hỏi này. */
   error?: { message: string; prompt: string }
+  /**
+   * Lộ trình lập từ form ngay trong cuộc trò chuyện: đang chạy thì hiện tiến độ, xong thì
+   * hiện lộ trình đầy đủ (phương án, lịch theo giờ, bản đồ). Mở lại hội thoại thì chỉ còn
+   * bản chữ trong `content`.
+   */
+  plan?: {
+    id: string
+    form: TripForm
+    events: PlanEvent[]
+    result?: ItineraryResult
+    error?: string
+  }
 }
 
 type Props = {
@@ -39,6 +56,10 @@ type Props = {
   onSuggest: (prompt: string) => void
   /** Gửi lại một câu hỏi chưa có câu trả lời (lỗi, hoặc luồng trước bị ngắt giữa chừng). */
   onRetry: (prompt: string) => void
+  /** Mở form chuyến đi (sửa thông tin để lập lại lộ trình). */
+  onOpenForm: () => void
+  /** Trả lời câu hỏi lại của pipeline: điền thêm vào form của lượt đó rồi gửi lại. */
+  onAnswerPlan: (form: TripForm) => void
   busy: boolean
 }
 
@@ -76,6 +97,8 @@ export function MessageList({
   userName,
   onSuggest,
   onRetry,
+  onOpenForm,
+  onAnswerPlan,
   busy,
 }: Props) {
   const bottomRef = React.useRef<HTMLDivElement>(null)
@@ -139,6 +162,8 @@ export function MessageList({
             }
             onSuggest={onSuggest}
             onRetry={onRetry}
+            onOpenForm={onOpenForm}
+            onAnswerPlan={onAnswerPlan}
           />
         )
       )}
@@ -188,11 +213,15 @@ function AssistantMessage({
   followUps,
   onSuggest,
   onRetry,
+  onOpenForm,
+  onAnswerPlan,
 }: {
   message: DisplayMessage
   followUps: typeof FOLLOW_UPS
   onSuggest: (prompt: string) => void
   onRetry: (prompt: string) => void
+  onOpenForm: () => void
+  onAnswerPlan: (form: TripForm) => void
 }) {
   const isWaiting = message.pending && !message.content
   const error = message.error
@@ -209,7 +238,13 @@ function AssistantMessage({
           </span>
         </div>
 
-        {error ? (
+        {message.plan ? (
+          <PlanBubble
+            plan={message.plan}
+            onOpenForm={onOpenForm}
+            onAnswer={onAnswerPlan}
+          />
+        ) : error ? (
           <ErrorCard
             title="Trợ lý chưa trả lời được"
             message={error.message}
@@ -261,6 +296,45 @@ function AssistantMessage({
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Lộ trình trong cuộc trò chuyện: tiến độ khi đang chạy, lộ trình đầy đủ khi xong. */
+function PlanBubble({
+  plan,
+  onOpenForm,
+  onAnswer,
+}: {
+  plan: NonNullable<DisplayMessage["plan"]>
+  onOpenForm: () => void
+  onAnswer: (form: TripForm) => void
+}) {
+  if (plan.error)
+    return (
+      <ErrorCard
+        title="Chưa lập được lộ trình"
+        message={plan.error}
+        retryLabel="Mở lại form"
+        onRetry={onOpenForm}
+      />
+    )
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4 rounded-2xl bg-trip-paper p-3 text-trip-ink ring-1 ring-border/70 sm:p-4">
+      {plan.result ? (
+        <>
+          {plan.events.length > 0 && (
+            <PlanTrace events={plan.events} running={false} collapsible />
+          )}
+          <ItineraryView
+            result={plan.result}
+            onAnswer={(set) => onAnswer({ ...plan.form, ...set })}
+            onOpenForm={onOpenForm}
+          />
+        </>
+      ) : (
+        <PlanTrace events={plan.events} running />
+      )}
     </div>
   )
 }

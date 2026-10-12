@@ -5,6 +5,8 @@
  * localStorage (xem `auth.tsx`) và gắn vào header Authorization ở đây.
  */
 
+import type { ItineraryResult, TripForm } from "@/lib/itinerary"
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 const API = `${BASE_URL}/api/v1`
 
@@ -24,9 +26,51 @@ export type User = {
 }
 
 export type ChatReply = { thread_id: string; reply: string }
-export type ChatMessage = { role: string; content: string }
+export type ChatMessage = {
+  role: string
+  content: string
+  /** Lộ trình lập trong cuộc trò chuyện, lưu nguyên để mở lại vẫn hiện đầy đủ. */
+  plan?: { form: TripForm; result: ItineraryResult } | null
+}
 export type ChatHistory = { thread_id: string; messages: ChatMessage[] }
-export type ChatThread = { thread_id: string; last_active_at: string }
+export type ChatThread = {
+  thread_id: string
+  /** Câu hỏi đầu tiên (rút gọn), người dùng đổi tên được. */
+  title: string
+  created_at: string
+  last_active_at: string
+}
+/**
+ * Thông tin chuyến đi đã nhắc trong cuộc trò chuyện, để điền sẵn form ở trang chat.
+ * `null` hoặc `[]` = chưa nói tới. Giá trị lựa chọn trùng với id của form.
+ */
+export type TripInfo = {
+  persona: string | null
+  destination: string | null
+  start_date: string | null
+  days: number | null
+  adults: number | null
+  children: number | null
+  seniors: number | null
+  /** Tổng cả đoàn, triệu đồng. */
+  budget_million: number | null
+  budget_hard: boolean | null
+  access: string[]
+  interests: string[]
+  transport: string | null
+  pace: string | null
+}
+/**
+ * Form chuyến đi của một hội thoại, trợ lý tự điền dần khi người dùng kể. `missing` là các
+ * mục bắt buộc còn trống; `open_form` bật đúng lượt form vừa đủ và người dùng muốn lập
+ * lộ trình — giao diện mở form cho họ xác nhận.
+ */
+export type TripState = {
+  info: TripInfo
+  missing: { field: string; label: string }[]
+  wants_plan: boolean
+  open_form: boolean
+}
 export type Page<T> = {
   items: T[]
   total: number
@@ -69,7 +113,7 @@ async function request<T>(
     // fetch chỉ ném khi không nối được tới server (chưa chạy, sai cổng, CORS chặn).
     throw new ApiError(
       0,
-      "Không kết nối được tới máy chủ. Backend đã chạy chưa?"
+      "Không kết nối được tới máy chủ. Kiểm tra mạng rồi bấm Thử lại nhé."
     )
   }
 
@@ -169,11 +213,52 @@ export const chat = {
       body: { message, thread_id: threadId ?? null },
     }),
 
-  threads: (token: string) =>
-    request<Page<ChatThread>>("/chat/threads?limit=50", { token }),
+  /** `query`: tìm trong tiêu đề và nội dung tin nhắn. */
+  threads: (token: string, query?: string) =>
+    request<Page<ChatThread>>(
+      `/chat/threads?limit=50${query?.trim() ? `&q=${encodeURIComponent(query.trim())}` : ""}`,
+      { token }
+    ),
+
+  rename: (token: string, threadId: string, title: string) =>
+    request<ChatThread>(`/chat/threads/${threadId}`, {
+      method: "PATCH",
+      token,
+      body: { title },
+    }),
 
   history: (token: string, threadId: string) =>
     request<ChatHistory>(`/chat/threads/${threadId}`, { token }),
+
+  /** Form chuyến đi trợ lý đã điền từ cuộc trò chuyện, kèm các mục bắt buộc còn thiếu. */
+  tripInfo: (token: string, threadId: string) =>
+    request<TripState>(`/chat/threads/${threadId}/trip-info`, { token }),
+
+  /**
+   * Bấm "Lập lộ trình" trong form của trang chat: lưu bản form đã xác nhận, lập lộ trình
+   * (theo dõi tiến độ bằng `streamPlanEvents` với `planThreadId`), rồi lộ trình dạng chữ
+   * được lưu vào cuộc trò chuyện. Mất 20–60 giây.
+   */
+  plan: (
+    token: string,
+    threadId: string,
+    form: TripForm,
+    planThreadId: string,
+    trip: TripInfo
+  ) =>
+    request<ChatPlanReply>(`/chat/threads/${threadId}/plan`, {
+      method: "POST",
+      token,
+      body: { form, plan_thread_id: planThreadId, trip },
+    }),
+
+  /** Người dùng xác nhận form (bấm Lập lộ trình): các lượt chat sau dùng đúng bản này. */
+  confirmTrip: (token: string, threadId: string, info: TripInfo) =>
+    request<TripState>(`/chat/threads/${threadId}/trip-info`, {
+      method: "PUT",
+      token,
+      body: info,
+    }),
 
   remove: (token: string, threadId: string) =>
     request<void>(`/chat/threads/${threadId}`, { method: "DELETE", token }),
@@ -196,10 +281,21 @@ export const chat = {
     }),
 }
 
+/** Lộ trình lập trong cuộc trò chuyện, kèm hai tin nhắn đã lưu vào hội thoại. */
+export type ChatPlanReply = {
+  /** `status` "need_info" = còn câu hỏi, chưa có gì được lưu vào hội thoại. */
+  plan: ItineraryResult
+  /** Form đã xác nhận, viết thành tin nhắn của người dùng. */
+  request_text: string
+  /** Lộ trình dạng markdown, tin nhắn của trợ lý. */
+  reply: string
+}
+
 /** Sự kiện backend đẩy về trong lúc trả lời. */
 export type ChatEvent =
   | { type: "start"; thread_id: string }
   | { type: "delta"; text: string }
+  | ({ type: "trip" } & TripState)
   | { type: "done"; thread_id: string }
   | { type: "error"; message: string }
 
@@ -223,7 +319,7 @@ export async function* streamChat(
     if (signal.aborted) return
     throw new ApiError(
       0,
-      "Không kết nối được tới máy chủ. Backend đã chạy chưa?"
+      "Không kết nối được tới máy chủ. Kiểm tra mạng rồi bấm Thử lại nhé."
     )
   }
 
@@ -259,6 +355,101 @@ function parseFrame(frame: string): ChatEvent | null {
   if (!line) return null
   try {
     return JSON.parse(line.slice(5).trim()) as ChatEvent
+  } catch {
+    return null
+  }
+}
+
+// ---------------------------------------------------------------- plan
+/** Một bước của pipeline lập lộ trình, đẩy qua `GET /plan/{id}/events`. */
+export type PlanEvent = {
+  id: string
+  /** Giây kể từ epoch, dạng chuỗi ("1791433249.123"). */
+  ts?: string
+  node: string
+  kind: string
+  text: string
+  data: Record<string, unknown>
+}
+
+export const plan = {
+  /** Lập lộ trình từ form (chỉ gửi ô đã điền). Mất 20–60 giây; tiến độ: `streamPlanEvents`. */
+  create: (token: string, form: TripForm, threadId: string) =>
+    request<ItineraryResult>("/plan", {
+      method: "POST",
+      token,
+      body: { ...form, thread_id: threadId },
+    }),
+
+  events: (token: string, threadId: string, signal: AbortSignal) =>
+    fetch(`${API}/plan/${threadId}/events`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal,
+    }),
+}
+
+/** Mã lộ trình do trình duyệt tạo, để mở stream tiến độ ngay khi vừa gửi form. */
+export function newPlanThreadId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8))
+  return `plan-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`
+}
+
+/**
+ * Đọc stream tiến độ của một lần lập lộ trình.
+ *
+ * Backend trả 404 cho tới khi `POST /plan` với mã này bắt đầu chạy, nên thử lại vài lần.
+ * Stream tự đóng sau sự kiện kết thúc lượt (node "turn", kind "done" | "error").
+ */
+export async function* streamPlanEvents(
+  token: string,
+  threadId: string,
+  signal: AbortSignal
+): AsyncGenerator<PlanEvent> {
+  let response: Response | null = null
+  for (let attempt = 0; attempt < 10 && !signal.aborted; attempt++) {
+    try {
+      response = await plan.events(token, threadId, signal)
+    } catch {
+      return // mất kết nối hoặc đã huỷ: tiến độ chỉ là phần phụ, không báo lỗi
+    }
+    if (response.status !== 404) break
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+  if (!response?.ok || !response.body) return
+
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
+  let buffer = ""
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += value
+      let boundary = buffer.indexOf("\n\n")
+      while (boundary !== -1) {
+        const event = parsePlanFrame(buffer.slice(0, boundary))
+        buffer = buffer.slice(boundary + 2)
+        if (event) yield event
+        boundary = buffer.indexOf("\n\n")
+      }
+    }
+  } catch {
+    // huỷ giữa chừng
+  } finally {
+    reader.cancel().catch(() => {})
+  }
+}
+
+function parsePlanFrame(frame: string): PlanEvent | null {
+  let id = ""
+  let data = ""
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("id:")) id = line.slice(3).trim()
+    else if (line.startsWith("data:")) data += line.slice(5).trim()
+  }
+  if (!data) return null
+  try {
+    const event = JSON.parse(data) as Omit<PlanEvent, "id">
+    return { ...event, id }
   } catch {
     return null
   }
