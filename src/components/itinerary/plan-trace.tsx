@@ -1,7 +1,27 @@
 "use client"
 
 import * as React from "react"
-import { ChevronDown } from "lucide-react"
+import {
+  AlertTriangle,
+  BadgeCheck,
+  CalendarClock,
+  CalendarRange,
+  ChevronDown,
+  CircleDot,
+  CircleHelp,
+  ClipboardList,
+  Filter,
+  Layers,
+  ListOrdered,
+  MessageSquareText,
+  Search,
+  Send,
+  ShieldCheck,
+  Star,
+  Timer,
+  Users,
+  type LucideIcon,
+} from "lucide-react"
 
 import type { PlanEvent } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -51,30 +71,81 @@ function Chips({ chips }: { chips: Chip[] }) {
   )
 }
 
+/** Biểu tượng theo việc của từng bước (node mới chưa có thì dùng chấm tròn). */
+const STEP_ICONS: Record<string, LucideIcon> = {
+  nhan_form: ClipboardList,
+  doc_loi_nhan: MessageSquareText,
+  phan_nhom: Users,
+  hoi_lai: CircleHelp,
+  tim_kiem: Search,
+  loc: Filter,
+  xac_minh: ShieldCheck,
+  cham: Star,
+  chot_danh_sach: CalendarRange,
+  xep_lich: CalendarClock,
+  kiem_lich: Timer,
+  xep_hang: ListOrdered,
+  ghep: Layers,
+  quyet_dinh: BadgeCheck,
+  tra_ket_qua: Send,
+}
+
+/** Màu theo giai đoạn: nền nhạt + chữ đậm cùng tông, cho bước đã xong. */
+const PHASE_TONE: Record<Phase, string> = {
+  intake: "bg-trip-sky-bg text-trip-sky ring-trip-sky/25",
+  search: "bg-trip-lotus-bg text-trip-lotus ring-trip-lotus/25",
+  schedule: "bg-trip-warn-bg text-trip-warn ring-trip-warn-dot/30",
+  decide: "bg-trip-jade-bg text-trip-jade ring-trip-jade/25",
+  deliver: "bg-accent text-primary ring-primary/25",
+}
+
+/**
+ * Ký hiệu bước trên đường dọc: biểu tượng theo việc, màu theo giai đoạn. Đang chạy: nền
+ * gradient của web, vòng sáng lan ra; lỗi / thiếu dữ kiện: biểu tượng cảnh báo. Agent LLM ô
+ * tròn, bước code / điều phối ô bo góc.
+ */
 function StepMarker({
+  node,
   marker,
+  phase,
   busy,
   failed,
 }: {
+  node: string
   marker: Marker
+  phase: Phase
   busy: boolean
   failed: boolean
 }) {
+  const Icon = failed ? AlertTriangle : (STEP_ICONS[node] ?? CircleDot)
+  const shape = marker === "circle" ? "rounded-full" : "rounded-[10px]"
   return (
     <span
       aria-hidden
-      className={cn(
-        "absolute top-[7px] -left-[27px] size-3 border-2",
-        marker === "circle" && "rounded-full",
-        marker === "diamond" && "scale-90 rotate-45",
-        marker === "square" && "rounded-[2px]",
-        busy
-          ? "animate-pulse border-trip-jade bg-trip-sheet"
-          : failed
-            ? "border-trip-warn-dot bg-trip-warn-dot"
-            : "border-trip-jade bg-trip-jade"
+      className="absolute top-0 -left-[45px] grid size-8 place-items-center"
+    >
+      {busy && (
+        <span
+          className={cn(
+            "absolute inset-0 animate-ping bg-primary/35 motion-reduce:animate-none",
+            shape
+          )}
+        />
       )}
-    />
+      <span
+        className={cn(
+          "relative grid size-8 place-items-center shadow-[0_2px_6px_-2px_rgb(18_23_53/0.25)] ring-1 transition-colors duration-300 ring-inset",
+          shape,
+          busy
+            ? "bg-brand text-white ring-white/30"
+            : failed
+              ? "bg-trip-warn-bg text-trip-warn ring-trip-warn-dot/40"
+              : PHASE_TONE[phase]
+        )}
+      >
+        <Icon className="size-4" strokeWidth={2.2} />
+      </span>
+    </span>
   )
 }
 
@@ -156,7 +227,7 @@ export function PlanTrace({
 
       {open && (
         <div className="px-4 pb-4">
-          <ol className="relative ml-1.5 border-l-2 border-trip-line pl-5">
+          <ol className="relative ml-4 border-l-2 border-trip-line pl-7">
             {steps.length === 0 && (
               <li className="py-2 text-sm text-trip-ink-3">
                 Đang khởi động pipeline…
@@ -180,9 +251,11 @@ export function PlanTrace({
                       {PHASES[meta.phase]}
                     </li>
                   )}
-                  <li className="relative grid gap-1 py-2">
+                  <li className="relative grid animate-in gap-1 py-2 duration-300 fade-in slide-in-from-left-1 motion-reduce:animate-none">
                     <StepMarker
+                      node={step.node}
                       marker={meta.marker}
+                      phase={meta.phase}
                       busy={busy}
                       failed={Boolean(step.warn) && !busy}
                     />

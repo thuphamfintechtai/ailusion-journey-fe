@@ -144,7 +144,7 @@ export function MessageList({
   return (
     // Mọi tin nhắn bám một cột rộng: trợ lý sát mép trái, người dùng sát mép phải. Lộ trình dùng
     // hết bề ngang; khung chữ giữ tối đa TEXT_MAX cho dòng không quá dài.
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-9 px-4 pt-8 pb-10 sm:px-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 pt-8 pb-10 sm:px-6">
       {messages.map((message, index) =>
         message.role === "human" ? (
           // Danh sách chỉ nối thêm ở cuối, không sắp xếp lại, nên index đủ ổn định.
@@ -225,12 +225,12 @@ function regenerateOf(
 }
 
 /** Bề ngang tối đa của khung chữ, để dòng vừa mắt đọc. */
-const TEXT_MAX = "w-full max-w-3xl"
+const TEXT_MAX = "w-full max-w-[46rem]"
 
 function UserMessage({ content }: { content: string }) {
   return (
     <div className="flex animate-in justify-end duration-300 fade-in slide-in-from-bottom-2">
-      <div className="max-w-[min(80%,42rem)] rounded-[22px] rounded-br-md bg-brand px-5 py-3 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-white shadow-lg shadow-primary/20">
+      <div className="max-w-[min(78%,38rem)] rounded-[20px] rounded-br-md bg-brand px-4.5 py-3 text-[15px] leading-[1.65] break-words whitespace-pre-wrap text-white shadow-lg shadow-primary/20">
         {content}
       </div>
     </div>
@@ -269,7 +269,7 @@ function AssistantMessage({
       <div
         className={cn(
           "grid min-w-0 flex-1 gap-2.5",
-          !message.plan?.result && "max-w-3xl"
+          !message.plan?.result && "max-w-[46rem]"
         )}
       >
         <div className="flex items-center gap-2">
@@ -294,7 +294,7 @@ function AssistantMessage({
             onRetry={() => onRetry(error.prompt)}
           />
         ) : (
-          <div className="rounded-2xl bg-card px-5 py-4 text-[15px] leading-[1.7] break-words text-card-foreground shadow-[0_1px_2px_rgb(18_23_53/0.05),0_12px_32px_-16px_rgb(18_23_53/0.18)] ring-1 ring-border/70 sm:px-7 sm:py-6">
+          <div className="rounded-[20px] rounded-tl-md bg-card px-4.5 py-3.5 text-[15px] leading-[1.7] break-words text-card-foreground shadow-[0_1px_2px_rgb(18_23_53/0.05),0_12px_32px_-16px_rgb(18_23_53/0.18)] ring-1 ring-border/70 sm:px-5 sm:py-4">
             {isWaiting ? (
               <Thinking />
             ) : (

@@ -16,7 +16,12 @@ import "maplibre-gl/dist/maplibre-gl.css"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 
-import type { AltMode, ItineraryDay, ItineraryResult } from "@/lib/itinerary"
+import type {
+  AltMode,
+  ItineraryDay,
+  ItineraryItem,
+  ItineraryResult,
+} from "@/lib/itinerary"
 import { cn } from "@/lib/utils"
 
 import { ALT_MODES, altModeOf } from "./plan-shared"
@@ -56,6 +61,8 @@ type Stop = {
   tip: string
   /** Biến màu CSS của ngày (ghim điểm tham quan, tuyến). */
   color: string
+  /** Điểm tham quan / quán ăn: bấm ghim để mở chi tiết. */
+  item?: ItineraryItem
 }
 /** Một chặng: nhãn phương tiện + số phút đặt ở giữa đoạn. */
 type Leg = { from: Stop; to: Stop; min: number; mode: AltMode | null }
@@ -117,6 +124,7 @@ function stopsOf(days: MapDay[], stay: ItineraryResult["stay"]): Stops {
           name: item.name,
           tip: `${item.start} · ${item.name}`,
           color,
+          item,
         }
         markers.push(stop)
       } else if (item.type === "back" && homeStop && points.length > 1) {
@@ -194,6 +202,22 @@ function pinElement(stop: Stop): HTMLElement {
     height: `${size}px`,
   })
   el.title = stop.tip
+  if (stop.item) {
+    // Bấm ghim -> báo lên khung bản đồ (`DayMap` nghe sự kiện này) để mở chi tiết địa điểm.
+    const item = stop.item
+    el.style.cursor = "pointer"
+    el.setAttribute("role", "button")
+    el.setAttribute("aria-label", `Xem chi tiết ${stop.name}`)
+    el.addEventListener("click", (e) => {
+      e.stopPropagation()
+      el.dispatchEvent(
+        new CustomEvent<ItineraryItem>(PICK_EVENT, {
+          detail: item,
+          bubbles: true,
+        })
+      )
+    })
+  }
 
   const dot = document.createElement("div")
   Object.assign(dot.style, {
@@ -377,19 +401,37 @@ function drawLeaflet(container: HTMLElement, { markers, routes }: Stops) {
   return { resize: () => map.invalidateSize(), remove: () => map.remove() }
 }
 
+const PICK_EVENT = "trip-place-pick"
+
 export default function DayMap({
   days,
   stay,
   className,
   label,
+  onSelect,
 }: {
   days: MapDay[]
   stay: ItineraryResult["stay"]
   /** Chiều cao (và vị trí) do nơi dùng quyết định. */
   className?: string
   label: string
+  /** Bấm ghim điểm tham quan / quán ăn. */
+  onSelect?: (item: ItineraryItem) => void
 }) {
   const ref = React.useRef<HTMLDivElement>(null)
+  // Giữ hàm mới nhất mà không vẽ lại bản đồ khi nơi dùng render lại.
+  const select = React.useRef(onSelect)
+  React.useEffect(() => {
+    select.current = onSelect
+  }, [onSelect])
+  React.useEffect(() => {
+    const container = ref.current
+    if (!container) return
+    const pick = (e: Event) =>
+      select.current?.((e as CustomEvent<ItineraryItem>).detail)
+    container.addEventListener(PICK_EVENT, pick)
+    return () => container.removeEventListener(PICK_EVENT, pick)
+  }, [])
 
   React.useEffect(() => {
     const container = ref.current

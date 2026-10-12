@@ -15,6 +15,7 @@ import type {
 import { cn } from "@/lib/utils"
 
 import type { MapDay } from "./day-map"
+import { PlaceSheet } from "./plan-place"
 import {
   ALT_MODES,
   DayPills,
@@ -33,13 +34,16 @@ export function MapTab({
   dayIndex,
   onDay,
   stay,
+  destination,
 }: {
   days: ItineraryDay[]
   dayIndex: number
   onDay: (i: number) => void
   stay: ItineraryResult["stay"]
+  destination: string
 }) {
   const [all, setAll] = React.useState(false)
+  const [open, setOpen] = React.useState<ItineraryItem | null>(null)
   const day = days[dayIndex] ?? days[0]
   // Giữ nguyên mảng giữa các lần render để bản đồ không vẽ lại.
   const mapDays = React.useMemo<MapDay[]>(
@@ -136,10 +140,16 @@ export function MapTab({
           stay={stay}
           label={all ? "Bản đồ cả chuyến" : `Bản đồ ngày ${day.day}`}
           className={big ? "h-full" : "h-[min(65vh,600px)]"}
+          onSelect={setOpen}
         />
       </div>
       <RideTimes days={mapDays} />
       <Legend days={mapDays} />
+      <PlaceSheet
+        item={open}
+        destination={destination}
+        onClose={() => setOpen(null)}
+      />
     </div>
   )
 }

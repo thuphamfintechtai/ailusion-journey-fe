@@ -9,7 +9,15 @@
  */
 
 import * as React from "react"
-import { AlertTriangle, BedDouble, CircleHelp, Info, Quote } from "lucide-react"
+import {
+  AlertTriangle,
+  BedDouble,
+  Check,
+  CircleHelp,
+  Info,
+  Quote,
+  Sparkles,
+} from "lucide-react"
 
 import {
   isItineraryResult,
@@ -190,69 +198,21 @@ function Options({
       <div
         role="tablist"
         aria-label="Phương án"
-        className="grid grid-cols-3 gap-2"
+        className="grid gap-2.5 sm:grid-cols-3"
       >
-        {result.options.map((o) => {
-          const on = o.id === option.id
-          const cb = o.cost_breakdown
-          // Có khoảng "từ–đến" thì hiện khoảng, lộ trình cũ thì một con số.
-          const range =
-            cb?.total_min != null && cb.total_max != null
-              ? trieuRange(cb.total_min, cb.total_max)
-              : null
-          return (
-            <button
-              key={o.id}
-              type="button"
-              role="tab"
-              aria-selected={on}
-              onClick={() => {
-                setSelected(o.id)
-              }}
-              className={cn(
-                "grid min-w-0 content-start gap-0.5 rounded-xl border p-2.5 text-left transition-colors",
-                on
-                  ? "border-2 border-trip-fill bg-trip-sheet"
-                  : "border-trip-line bg-trip-sheet hover:bg-trip-sheet-2"
-              )}
-            >
-              <span className="text-[13.5px] font-bold">{o.name}</span>
-              {o.id === chosen && (
-                <span className="justify-self-start rounded-[5px] bg-trip-fill px-1.5 text-[11.5px] leading-[18px] font-bold text-trip-on-fill">
-                  Đề xuất
-                </span>
-              )}
-              <span
-                className={cn(
-                  "font-num leading-tight font-semibold",
-                  range
-                    ? "text-[17px] sm:text-[22px]"
-                    : "text-[22px] sm:text-[26px]"
-                )}
-              >
-                {range || o.estimated_prices?.length ? (
-                  <span
-                    className="mr-0.5 font-normal text-trip-ink-3"
-                    title={
-                      o.estimated_prices?.length
-                        ? `Có giá ước (chưa có giá thật): ${o.estimated_prices.join(", ")}`
-                        : "Khoảng ước, gồm cả phát sinh"
-                    }
-                    aria-label="khoảng"
-                  >
-                    ≈
-                  </span>
-                ) : null}
-                {range ?? trieu(o.total_cost)}
-              </span>
-              <span className="text-[11.5px] leading-snug text-trip-ink-3 sm:text-[12.5px]">
-                {o.better_at.join(" · ") || "lịch dự phòng"}
-              </span>
-            </button>
-          )
-        })}
+        {result.options.map((o) => (
+          <OptionCard
+            key={o.id}
+            option={o}
+            on={o.id === option.id}
+            recommended={o.id === chosen}
+            onSelect={() => setSelected(o.id)}
+          />
+        ))}
       </div>
-      {option.explanation && (
+      {/* Phương án đề xuất đã được giải thích ở đoạn trên (`result.why`): chỉ giải thích
+          thêm khi đang xem phương án khác. */}
+      {option.explanation && option.id !== chosen && (
         <p className="rounded-xl bg-trip-sheet px-3.5 py-2.5 text-[14.5px] text-trip-ink-2">
           {option.explanation}
         </p>
@@ -323,5 +283,104 @@ function Options({
           : ""}
       </p>
     </div>
+  )
+}
+
+/**
+ * Thẻ một phương án: tên + nhãn "Đề xuất" cùng hàng (giá các thẻ thẳng hàng nhau), giá ước
+ * lớn với đơn vị nhỏ, các điểm mạnh dạng chip. Thẻ đang xem có viền màu chính và dấu tích.
+ */
+function OptionCard({
+  option: o,
+  on,
+  recommended,
+  onSelect,
+}: {
+  option: ItineraryResult["options"][number]
+  on: boolean
+  recommended: boolean
+  onSelect: () => void
+}) {
+  const cb = o.cost_breakdown
+  // Có khoảng "từ–đến" thì hiện khoảng, lộ trình cũ thì một con số.
+  const text =
+    cb?.total_min != null && cb.total_max != null
+      ? trieuRange(cb.total_min, cb.total_max)
+      : trieu(o.total_cost)
+  const [amount, unit] = text.endsWith(" tr")
+    ? [text.slice(0, -3), "triệu"]
+    : [text, ""]
+  const strengths = o.better_at.length ? o.better_at : ["lịch dự phòng"]
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={on}
+      onClick={onSelect}
+      className={cn(
+        "group relative grid min-w-0 content-start gap-2.5 rounded-2xl border bg-trip-sheet p-3.5 text-left transition-all duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-trip-fill/30",
+        on
+          ? "border-trip-fill bg-accent/40 shadow-[0_8px_24px_-14px_rgb(58_86_197/0.55)] ring-1 ring-trip-fill"
+          : "border-trip-line hover:-translate-y-0.5 hover:border-trip-fill/40 hover:shadow-[0_8px_20px_-16px_rgb(18_23_53/0.35)]"
+      )}
+    >
+      <span className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-[14px] font-bold text-trip-ink">
+          {o.name}
+        </span>
+        {recommended && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[11px] font-bold text-white shadow-sm">
+            <Sparkles className="size-3" />
+            Đề xuất
+          </span>
+        )}
+        <span
+          aria-hidden
+          className={cn(
+            "grid size-5 shrink-0 place-items-center rounded-full border transition-colors",
+            on
+              ? "border-trip-fill bg-trip-fill text-trip-on-fill"
+              : "border-trip-line-2 text-transparent"
+          )}
+        >
+          <Check className="size-3" strokeWidth={3} />
+        </span>
+      </span>
+
+      <span className="grid gap-0.5">
+        <span className="text-[11.5px] font-medium text-trip-ink-3">
+          Ước tính cả đoàn
+        </span>
+        <span
+          className="flex items-baseline gap-1 text-trip-ink"
+          title={
+            o.estimated_prices?.length
+              ? `Có giá ước (chưa có giá thật): ${o.estimated_prices.join(", ")}`
+              : "Khoảng ước, gồm cả phát sinh"
+          }
+        >
+          <span className="font-display text-[24px] leading-none font-bold tracking-tight">
+            {amount}
+          </span>
+          {unit && (
+            <span className="text-[13px] font-semibold text-trip-ink-3">
+              {unit}
+            </span>
+          )}
+        </span>
+      </span>
+
+      <span className="flex flex-wrap gap-1.5">
+        {strengths.map((s) => (
+          <span
+            key={s}
+            className="inline-flex items-center gap-1 rounded-full bg-trip-sheet-2 px-2 py-0.5 text-[11.5px] font-medium text-trip-ink-2"
+          >
+            <Check className="size-3 text-trip-jade" strokeWidth={2.6} />
+            {s}
+          </span>
+        ))}
+      </span>
+    </button>
   )
 }

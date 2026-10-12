@@ -264,8 +264,8 @@ export function buildTrace(events: PlanEvent[]) {
       step.error = true
       if (lane) lane.failed = true
     }
-    // Chữ của tool_call/tool_result chỉ dùng khi bước chưa có câu nào khác
-    if (e.text && (!TOOL_KINDS.has(e.kind) || !(lane?.text ?? step.text))) {
+    // Sự kiện gọi tool chỉ thêm chip nguồn, không thay câu mô tả của bước ("gọi get_...").
+    if (e.text && !TOOL_KINDS.has(e.kind)) {
       if (lane) lane.text = e.text
       else step.text = e.text
     }

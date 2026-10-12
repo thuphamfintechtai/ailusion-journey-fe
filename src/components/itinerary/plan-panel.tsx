@@ -146,6 +146,7 @@ export function PlanPanel({
             dayIndex={dayIndex}
             onDay={setDayIndex}
             stay={result.stay}
+            destination={result.destination}
           />
         )}
         {tab === "cost" && <CostTab option={option} stay={result.stay} />}
