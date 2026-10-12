@@ -40,6 +40,7 @@ const PARTS = [
   { key: "tickets", label: "Vé tham quan", cls: "bg-trip-tickets" },
   { key: "food", label: "Ăn uống", cls: "bg-trip-food" },
   { key: "transport", label: "Di chuyển", cls: "bg-trip-move" },
+  { key: "rental", label: "Thuê xe", cls: "bg-trip-canbang" },
   { key: "extras", label: "Phát sinh", cls: "bg-trip-inter" },
 ] as const
 
@@ -148,7 +149,10 @@ function TripCost({ option }: { option: ItineraryOption }) {
 
 /** Thanh chia theo khoản và chú thích; lộ trình cũ không có "Phát sinh" thì bỏ khoản đó. */
 function SplitBar({ split }: { split: Split }) {
-  const parts = PARTS.filter((p) => p.key !== "extras" || split.extras)
+  // Khoản không phải lộ trình nào cũng có (phát sinh, thuê xe) thì bỏ khi bằng 0.
+  const parts = PARTS.filter(
+    (p) => (p.key !== "extras" && p.key !== "rental") || split[p.key]
+  )
   const sum = parts.reduce((t, p) => t + (split[p.key] ?? 0), 0)
   if (sum <= 0) return null
   return (
@@ -421,6 +425,21 @@ function linesOf(
   night: boolean
 ): Line[] {
   const lines: Line[] = []
+  const rent = day.cost?.rental_max
+  if (rent) {
+    const mode = modeOf(day.items.find((x) => x.travel_mode)?.travel_mode)
+    lines.push({
+      key: "rental",
+      icon: mode.icon,
+      iconCls: "text-trip-canbang",
+      name: `Thuê ${mode.label?.toLowerCase() ?? "xe"} + xăng trong ngày`,
+      note: day.cost?.rental_note ?? undefined,
+      amount: [day.cost?.rental_min ?? rent, rent],
+      part: "rental",
+    })
+  }
+  // Tên điểm vừa rời, để mỗi chặng ghi rõ "A → B".
+  let from = stay?.name ?? "chỗ ở"
   day.items.forEach((item, i) => {
     const travel = rangeOf(
       item.travel_cost_min,
@@ -433,8 +452,13 @@ function linesOf(
         key: `leg-${i}`,
         icon: mode.icon,
         iconCls: "text-trip-move",
-        name: `${mode.label ?? "Đi"} tới ${item.name}`,
+        name: `${from} → ${
+          item.type === "back"
+            ? `${stay?.name ?? "chỗ ở"} (về chỗ ở)`
+            : item.name
+        }`,
         note: [
+          mode.label ?? null,
           item.travel_min > 0 ? `${item.travel_min} phút` : null,
           item.travel_km ? km(item.travel_km) : null,
         ]
@@ -445,6 +469,7 @@ function linesOf(
       })
     }
     if (item.type === "visit" || item.type === "meal") {
+      from = item.name
       const meal = item.type === "meal"
       lines.push({
         key: `item-${i}`,

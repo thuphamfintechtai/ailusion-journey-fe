@@ -109,6 +109,8 @@ export type CostSplit = {
   tickets: number
   food: number
   transport: number
+  /** Thuê xe tự lái (xe máy / ô tô), số giữa. */
+  rental?: number
   total: number
 }
 
@@ -128,7 +130,13 @@ export type CostRange = {
   extra_items?: ExtraItem[]
 }
 
-export type DayCost = CostSplit & CostRange
+export type DayCost = CostSplit &
+  CostRange & {
+    rental_min?: number
+    rental_max?: number
+    /** VD "Thuê 2 xe máy × 1 ngày (100.000–150.000 đ/xe/ngày); có xe riêng thì bỏ khoản này". */
+    rental_note?: string | null
+  }
 
 export type ItineraryDay = {
   day: number
