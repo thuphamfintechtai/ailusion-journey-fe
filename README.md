@@ -37,23 +37,30 @@ cd ../ailusion-journey-be && make services && make migrate && make dev
 pnpm dev
 ```
 
-## Luồng chat
+## Luồng chat và lập lộ trình
 
 ```
-Trình duyệt :3000 ──► BE :8000 ──► LLM service :8001 ──► Gemini
+Trình duyệt :3000 ──► BE :8000 ──► LLM service :8001 ──► OpenAI (gpt-4.1-mini)
+                                          └──► MCP server :8002 (dữ liệu địa điểm, chỗ ở, thời tiết…)
 ```
 
-| Trang    | Việc                                                                  |
-| -------- | --------------------------------------------------------------------- |
-| `/login` | Đăng nhập / đăng ký (cùng một form, bấm để đổi)                       |
-| `/chat`  | Danh sách hội thoại + khung chat, câu trả lời hiện dần theo stream    |
-| `/`      | Chuyển hướng sang `/chat`; chưa đăng nhập thì `/chat` đẩy về `/login` |
+| Trang                                                        | Việc                                                                                                                                              |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                                                          | Trang giới thiệu; ô "lên kế hoạch" soạn sẵn câu hỏi rồi chuyển sang `/chat` (chưa đăng nhập thì qua đăng ký trước)                                |
+| `/login`, `/register`, `/forgot-password`, `/reset-password` | Đăng nhập, đăng ký, quên / đặt lại mật khẩu                                                                                                       |
+| `/chat`                                                      | Danh sách hội thoại + khung chat (trả lời dần theo stream). Khi người dùng muốn lập lộ trình, form chuyến đi tự mở; lộ trình hiện ngay trong chat |
+| `/plan`                                                      | Lập lộ trình riêng: cùng form, khung kết quả và tiến độ với trang chat                                                                            |
 
-| File                    | Việc                                           |
-| ----------------------- | ---------------------------------------------- |
-| `src/lib/api.ts`        | Gọi BE; `streamChat()` tự tách khung SSE       |
-| `src/lib/auth.tsx`      | Phiên đăng nhập trong localStorage             |
-| `src/components/chat/*` | `message-list`, `message-input`, `thread-list` |
+| File                                           | Việc                                                                                                     |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `src/lib/api.ts`                               | Gọi BE; `streamChat()` tự tách khung SSE; `streamPlanEvents()` đọc tiến độ lập lộ trình                  |
+| `src/lib/itinerary.ts`                         | Kiểu dữ liệu form (`TripForm`) và kết quả (`ItineraryResult`) của pipeline lập lộ trình, nhãn tiếng Việt |
+| `src/lib/auth.tsx`                             | Phiên đăng nhập trong localStorage                                                                       |
+| `src/components/chat/*`                        | `message-list`, `message-input`, `thread-list`, `markdown`                                               |
+| `src/components/itinerary/trip-form-sheet.tsx` | Form chuyến đi (chỉ gửi ô đã điền; ô trống thì service đọc từ lời nhắn hoặc hỏi lại)                     |
+| `src/components/itinerary/itinerary-view.tsx`  | Kết quả: câu hỏi lại kèm nút chọn, tối đa 3 phương án, tab từng ngày, bản đồ, giá ước                    |
+| `src/components/itinerary/plan-trace.tsx`      | Tiến độ từng bước của pipeline (SSE)                                                                     |
+| `src/components/itinerary/day-map.tsx`         | Bản đồ một ngày (Leaflet, chỉ chạy trên trình duyệt)                                                     |
 
 Vài điểm đáng lưu ý:
 
@@ -84,19 +91,26 @@ Pre-commit hook chạy `lint-staged`: ESLint `--fix` + Prettier trên các file 
 
 ```
 src/
-├── app/                 # App Router
-│   ├── layout.tsx       # ThemeProvider + AuthProvider
-│   ├── page.tsx         # chuyển hướng sang /chat
-│   ├── login/page.tsx
-│   └── chat/page.tsx
+├── app/                   # App Router
+│   ├── layout.tsx         # ThemeProvider + AuthProvider
+│   ├── page.tsx           # trang giới thiệu
+│   ├── (auth)/            # login, register, forgot-password, reset-password
+│   ├── chat/page.tsx      # chat + lập lộ trình trong chat
+│   └── plan/page.tsx      # lập lộ trình riêng
 ├── components/
-│   ├── chat/            # message-list, message-input, thread-list
-│   ├── ui/              # shadcn/ui (button, card, input, label, textarea)
+│   ├── auth/              # form đăng nhập / đăng ký
+│   ├── chat/              # message-list, message-input, thread-list, markdown
+│   ├── itinerary/         # trip-form-sheet, itinerary-view, plan-trace, day-map
+│   ├── home/              # các khối của trang giới thiệu
+│   ├── ui/                # shadcn/ui (button, card, input, label, textarea)
 │   └── theme-provider.tsx
 └── lib/
-    ├── api.ts           # client gọi backend + đọc stream SSE
-    ├── auth.tsx         # phiên đăng nhập (localStorage)
-    └── utils.ts         # cn() helper
+    ├── api.ts             # client gọi backend + đọc stream SSE
+    ├── itinerary.ts       # kiểu dữ liệu form / kết quả lập lộ trình
+    ├── auth.tsx           # phiên đăng nhập (localStorage)
+    ├── destinations.ts    # điểm đến + ảnh (Wikimedia Commons) cho trang giới thiệu
+    ├── pending-prompt.ts  # câu hỏi soạn ở trang chủ, chờ gửi khi vào /chat
+    └── utils.ts           # cn() helper
 ```
 
 Alias import: `@/*` → `src/*`.
