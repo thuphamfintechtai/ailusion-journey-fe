@@ -236,15 +236,16 @@ function Options({
                 </span>
               )}
               <span className="font-num text-[22px] leading-tight font-semibold sm:text-[26px]">
-                {trieu(o.total_cost)}
                 {o.estimated_prices?.length ? (
                   <span
-                    className="ml-1 align-super text-[11px] font-normal text-trip-ink-3"
-                    title={`Giá ước: ${o.estimated_prices.join(", ")}`}
+                    className="mr-0.5 font-normal text-trip-ink-3"
+                    title={`Có giá ước (chưa có giá thật): ${o.estimated_prices.join(", ")}`}
+                    aria-label="khoảng"
                   >
-                    ước
+                    ≈
                   </span>
                 ) : null}
+                {trieu(o.total_cost)}
               </span>
               <span className="text-[11.5px] leading-snug text-trip-ink-3 sm:text-[12.5px]">
                 {o.better_at.join(" · ") || "lịch dự phòng"}

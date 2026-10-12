@@ -6,34 +6,37 @@ import { ChevronDown } from "lucide-react"
 import type { PlanEvent } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
-type Phase = "context" | "agents" | "discussion" | "decide"
+type Phase = "intake" | "search" | "schedule" | "decide"
 
-/** Tên hiển thị các node của pipeline POST /plan (coordinator + 3 agent, LLM service). */
+/** Tên hiển thị các node của pipeline lập lộ trình (LLM service, itinerary/pipeline.py).
+ * 🧠 = bước có agent LLM; còn lại là code. */
 const NODES: Record<string, { label: string; phase: Phase }> = {
-  boi_canh: { label: "Bối cảnh chuyến đi", phase: "context" },
-  chien_luoc: { label: "Lập chiến lược theo nhóm", phase: "context" },
-  agent: { label: "Ba agent đề xuất song song", phase: "agents" },
-  tong_hop: { label: "Gộp dữ liệu của ba agent", phase: "discussion" },
-  thao_luan: { label: "🧠 Coordinator gộp đề xuất", phase: "discussion" },
-  xep_nhap: { label: "Xếp giờ thật cho bản nháp", phase: "discussion" },
-  phan_bien: { label: "Các agent phản biện bản nháp", phase: "discussion" },
-  chot: { label: "🧠 Coordinator chốt", phase: "discussion" },
-  xep_lich: { label: "Xếp ba phương án theo bản chốt", phase: "decide" },
-  kiem_tra: { label: "Kiểm tra ngân sách, giờ giấc", phase: "decide" },
-  rui_ro_chon: { label: "Mô phỏng rủi ro, chọn phương án", phase: "decide" },
-  giai_thich: { label: "Viết lời giải thích", phase: "decide" },
+  nhan_form: { label: "Nhận form", phase: "intake" },
+  doc_loi_nhan: { label: "🧠 Đọc lời nhắn", phase: "intake" },
+  phan_nhom: { label: "Phân nhóm khách, tính giờ rảnh", phase: "intake" },
+  hoi_lai: { label: "Hỏi lại thông tin còn thiếu", phase: "intake" },
+  tim_kiem: { label: "Tìm chỗ chơi, quán ăn, chỗ ở", phase: "search" },
+  loc: { label: "Lọc chỗ không đi được", phase: "search" },
+  xac_minh: { label: "🧠 Experience + Budget xác minh", phase: "search" },
+  cham: { label: "Chấm điểm, chọn chỗ ở", phase: "schedule" },
+  chot_danh_sach: { label: "Chia chỗ cho từng ngày", phase: "schedule" },
+  xep_lich: { label: "🧠 Planner xếp lịch", phase: "schedule" },
+  kiem_lich: { label: "Chạy thử lịch, đặt giờ ăn", phase: "schedule" },
+  xep_hang: { label: "Xếp hạng lịch từng ngày", phase: "decide" },
+  ghep: { label: "Ghép phương án, kiểm ngân sách", phase: "decide" },
+  quyet_dinh: { label: "🧠 Decision chốt phương án", phase: "decide" },
+  tra_ket_qua: { label: "Trả kết quả", phase: "decide" },
 }
 
 const PHASES: Record<Phase, string> = {
-  context: "Trip context",
-  agents: "Agent làm việc",
-  discussion: "Thảo luận",
-  decide: "Final itinerary",
+  intake: "Nhận thông tin",
+  search: "Tìm và xác minh",
+  schedule: "Xếp lịch",
+  decide: "Chốt phương án",
 }
 
-/** Ba agent, theo `role` trong tên node (agent:planner, phan_bien:budget...). */
+/** Hai agent chạy song song ở bước xác minh (node "xac_minh:experience", "xac_minh:budget"). */
 const ROLES: Record<string, string> = {
-  planner: "🗺️ Planner",
   experience: "🍜 Experience",
   budget: "💰 Budget",
 }
@@ -74,7 +77,6 @@ type Lane = {
 function buildTrace(events: PlanEvent[]) {
   const steps: Step[] = []
   const lanes = new Map<string, Map<string, Lane>>() // node -> role -> lane
-  let toolCalls = 0
   for (const e of events) {
     if (e.node === "turn") continue
     const [base, role = ""] = e.node.split(":")
@@ -85,9 +87,8 @@ function buildTrace(events: PlanEvent[]) {
       steps.push(step)
     }
     step.end = Math.max(step.end, ts)
-    if (e.kind === "tool_call") toolCalls += 1
 
-    if ((base === "agent" || base === "phan_bien") && ROLES[role]) {
+    if (base === "xac_minh" && ROLES[role]) {
       const byRole = lanes.get(base) ?? new Map<string, Lane>()
       const lane = byRole.get(role) ?? {
         role,
@@ -107,17 +108,14 @@ function buildTrace(events: PlanEvent[]) {
       if (e.kind === "plan" || e.kind === "finding") lane.text = e.text
       byRole.set(role, lane)
       lanes.set(base, byRole)
-      step.text =
-        base === "agent"
-          ? "Mỗi agent dùng bộ công cụ riêng rồi đưa ra đề xuất"
-          : "Mỗi agent soát bản nháp theo góc của mình"
+      step.text = "Hai agent chạy song song, chỉ nhận kết quả có bằng chứng"
     } else if (e.text) {
       step.text = e.text
       if (e.text.startsWith("LLM lỗi")) step.failed = true
     }
   }
   const lanesOf = (node: string) => [...(lanes.get(node)?.values() ?? [])]
-  return { steps, lanesOf, toolCalls }
+  return { steps, lanesOf }
 }
 
 function duration(seconds: number): string {
@@ -136,10 +134,7 @@ export function PlanTrace({
 }) {
   const [open, setOpen] = React.useState(!collapsible)
   const [now, setNow] = React.useState(() => Date.now() / 1000)
-  const { steps, lanesOf, toolCalls } = React.useMemo(
-    () => buildTrace(events),
-    [events]
-  )
+  const { steps, lanesOf } = React.useMemo(() => buildTrace(events), [events])
 
   React.useEffect(() => {
     if (!running) return
@@ -169,8 +164,7 @@ export function PlanTrace({
         </span>
         <span className="min-w-0 flex-1 text-[14.5px] text-trip-ink-2">
           <b className="text-trip-ink">{title}</b>{" "}
-          {!running &&
-            `coordinator và 3 agent, ${steps.length} bước, ${toolCalls} lượt gọi công cụ`}
+          {!running && `${steps.length} bước`}
         </span>
         <span className="font-num text-base font-semibold text-trip-ink">
           {duration(elapsed)}
@@ -195,7 +189,7 @@ export function PlanTrace({
           {steps.map((step, i) => {
             const meta = NODES[step.node] ?? {
               label: step.node,
-              phase: "decide" as Phase,
+              phase: "decide" as Phase, // node mới chưa có nhãn: hiện tên gốc
             }
             const busy = running && i === steps.length - 1
             const next = steps[i + 1]?.start ?? (running ? now : step.end)
@@ -232,7 +226,7 @@ export function PlanTrace({
                     <p className="text-[13.5px] text-trip-ink-2">{step.text}</p>
                   )}
                   {lanes.length > 0 && (
-                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
                       {lanes.map((lane) => (
                         <div
                           key={lane.role}

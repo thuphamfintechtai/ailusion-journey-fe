@@ -310,7 +310,8 @@ export default function ChatPage() {
     info: TripInfo | null = lastTripRef.current
   ) {
     if (info) lastTripRef.current = info
-    if (!token || !threadId || busy) return
+    if (!token || busy) return
+    // Chưa có hội thoại (chuyến đi mới): BE tạo hội thoại khi lập lộ trình, trả mã về sau.
     const chatThread = threadId
     const id = newPlanThreadId()
     const progress = new AbortController()
@@ -365,6 +366,13 @@ export default function ChatPage() {
           )
         })
       updatePlan(() => ({ result: reply.plan }), reply.reply || undefined)
+      if (!chatThread) {
+        setThreadId(reply.thread_id)
+        addThreadOptimistically(
+          reply.thread_id,
+          `Lập lộ trình ${planForm.destination}`
+        )
+      }
     } catch (err) {
       updatePlan(() => ({
         error:

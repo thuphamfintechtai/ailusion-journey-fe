@@ -237,20 +237,24 @@ export const chat = {
   /**
    * Bấm "Lập lộ trình" trong form của trang chat: lưu bản form đã xác nhận, lập lộ trình
    * (theo dõi tiến độ bằng `streamPlanEvents` với `planThreadId`), rồi lộ trình dạng chữ
-   * được lưu vào cuộc trò chuyện. Mất 20–60 giây.
+   * được lưu vào cuộc trò chuyện. Mất 20–60 giây. Chưa có hội thoại (`threadId` null) thì BE
+   * tạo hội thoại mới, mã trả về ở `thread_id`.
    */
   plan: (
     token: string,
-    threadId: string,
+    threadId: string | null,
     form: TripForm,
     planThreadId: string,
     trip: TripInfo
   ) =>
-    request<ChatPlanReply>(`/chat/threads/${threadId}/plan`, {
-      method: "POST",
-      token,
-      body: { form, plan_thread_id: planThreadId, trip },
-    }),
+    request<ChatPlanReply>(
+      threadId ? `/chat/threads/${threadId}/plan` : "/chat/plan",
+      {
+        method: "POST",
+        token,
+        body: { form, plan_thread_id: planThreadId, trip },
+      }
+    ),
 
   /** Người dùng xác nhận form (bấm Lập lộ trình): các lượt chat sau dùng đúng bản này. */
   confirmTrip: (token: string, threadId: string, info: TripInfo) =>
@@ -283,6 +287,8 @@ export const chat = {
 
 /** Lộ trình lập trong cuộc trò chuyện, kèm hai tin nhắn đã lưu vào hội thoại. */
 export type ChatPlanReply = {
+  /** Hội thoại chứa lộ trình — mới tạo nếu lập lộ trình từ khung chat trống. */
+  thread_id: string
   /** `status` "need_info" = còn câu hỏi, chưa có gì được lưu vào hội thoại. */
   plan: ItineraryResult
   /** Form đã xác nhận, viết thành tin nhắn của người dùng. */
