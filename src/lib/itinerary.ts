@@ -163,6 +163,21 @@ export type ItineraryResult = {
   }
 }
 
+/**
+ * Kết quả đúng dạng pipeline hiện tại. Hội thoại lập trước khi đổi pipeline lưu lộ trình theo
+ * dạng cũ (`options` là object theo phương án "canbang"…, không có `status`): không dựng khung
+ * kết quả từ đó được, chỉ hiện bản chữ đã lưu cùng tin nhắn.
+ */
+export function isItineraryResult(value: unknown): value is ItineraryResult {
+  const r = value as Partial<ItineraryResult> | null
+  return (
+    !!r &&
+    typeof r.status === "string" &&
+    Array.isArray(r.options) &&
+    Array.isArray(r.questions)
+  )
+}
+
 // ---------------------------------------------------------------- nhãn
 
 export const PURPOSES: { id: Purpose; label: string }[] = [

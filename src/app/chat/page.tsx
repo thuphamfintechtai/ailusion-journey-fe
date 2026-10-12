@@ -24,7 +24,7 @@ import {
 } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { peekPendingPrompt, takePendingPrompt } from "@/lib/pending-prompt"
-import type { TripForm } from "@/lib/itinerary"
+import { isItineraryResult, type TripForm } from "@/lib/itinerary"
 import { cn } from "@/lib/utils"
 
 export default function ChatPage() {
@@ -138,15 +138,17 @@ export default function ChatPage() {
         .map((m): DisplayMessage => ({
           role: m.role as "human" | "ai",
           content: m.content,
-          // Lộ trình đã lưu: dựng lại khung đầy đủ (3 phương án, lịch, bản đồ).
-          plan: m.plan
-            ? {
-                id: m.plan.result.thread_id,
-                form: m.plan.form,
-                events: [],
-                result: m.plan.result,
-              }
-            : undefined,
+          // Lộ trình đã lưu: dựng lại khung đầy đủ (3 phương án, lịch, bản đồ). Lộ trình lưu
+          // theo dạng của pipeline cũ thì chỉ hiện bản chữ (`content`).
+          plan:
+            m.plan && isItineraryResult(m.plan.result)
+              ? {
+                  id: m.plan.result.thread_id,
+                  form: m.plan.form,
+                  events: [],
+                  result: m.plan.result,
+                }
+              : undefined,
         }))
       setMessages(loaded)
     } catch (err) {

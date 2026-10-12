@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 
 import {
+  isItineraryResult,
   money,
   trieu,
   type ItineraryDay,
@@ -63,6 +64,8 @@ export function ItineraryView({
   onAnswer: (set: Partial<TripForm>) => void
   onOpenForm: () => void
 }) {
+  // Dữ liệu không đúng dạng hiện tại (VD lộ trình lưu từ pipeline cũ): không dựng, tránh sập trang.
+  if (!isItineraryResult(result)) return null
   if (result.status === "need_info")
     return (
       <Questions result={result} onAnswer={onAnswer} onOpenForm={onOpenForm} />
