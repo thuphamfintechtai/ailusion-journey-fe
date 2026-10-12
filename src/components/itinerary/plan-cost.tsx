@@ -31,8 +31,11 @@ import {
   km,
   modeOf,
   moneyRange,
+  forPeople,
   rangeOf,
   trieuRange,
+  useTrip,
+  vehiclesOf,
 } from "./plan-shared"
 
 const PARTS = [
@@ -59,12 +62,20 @@ export function CostTab({
   option: ItineraryOption
   stay: ItineraryResult["stay"]
 }) {
+  const { groupSize, party } = useTrip()
   // null = "Cả chuyến", số = vị trí ngày.
   const [sel, setSel] = React.useState<number | null>(null)
   const day = sel == null ? null : option.days[sel]
   return (
     <div className="grid gap-4">
-      <TabIntro>Ước tính cho cả đoàn: cả chuyến hoặc từng ngày.</TabIntro>
+      <TabIntro>
+        Ước tính {forPeople(groupSize)}: cả chuyến hoặc từng ngày.
+      </TabIntro>
+      {party && (
+        <p className="-mt-2 text-[13px] text-trip-ink-2">
+          Di chuyển: <b className="font-semibold">{party}</b>
+        </p>
+      )}
       <DayPills
         days={option.days}
         value={sel ?? 0}
@@ -416,13 +427,16 @@ type Line = {
   amount: [number, number] | null
   part: Part
   extra?: boolean
+  /** Chữ thay cho số tiền (VD chặng tự lái "trong tiền thuê xe"). */
+  label?: string
 }
 
 /** Các khoản của một ngày theo thứ tự đi: chặng xe, điểm/bữa, rồi tiền phòng đêm đó. */
 function linesOf(
   day: ItineraryDay,
   stay: ItineraryResult["stay"],
-  night: boolean
+  night: boolean,
+  vehicles: string | null
 ): Line[] {
   const lines: Line[] = []
   const rent = day.cost?.rental_max
@@ -458,7 +472,7 @@ function linesOf(
             : item.name
         }`,
         note: [
-          mode.label ?? null,
+          vehicles ?? mode.label ?? null,
           item.travel_min > 0 ? `${item.travel_min} phút` : null,
           item.travel_km ? km(item.travel_km) : null,
         ]
@@ -476,8 +490,16 @@ function linesOf(
         icon: meal ? Utensils : MapPin,
         iconCls: meal ? "text-trip-food" : "text-trip-tickets",
         name: item.name,
-        note: item.category ?? undefined,
-        amount: rangeOf(item.price_min, item.price_max, item.price),
+        // Quán: khoảng giá mỗi người; chợ / mua sắm: không ước tiền mua sắm.
+        note: item.price_note ?? item.category ?? undefined,
+        amount:
+          item.price_note && item.price_pp_min == null && !item.price
+            ? null
+            : rangeOf(item.price_min, item.price_max, item.price),
+        label:
+          item.price_note && item.price_pp_min == null && !item.price
+            ? "không ước tính"
+            : undefined,
         part: meal ? "food" : "tickets",
       })
     }
@@ -511,7 +533,85 @@ function linesOf(
   return lines
 }
 
-/** "Ngày N": tổng của ngày, chia theo khoản, rồi từng khoản theo thứ tự đi. */
+/** Một chặng "A → B" (đi lại + vé / ăn ở B), hoặc nhóm "Cả ngày" (thuê xe, đêm ở, phát sinh). */
+type Group = {
+  key: string
+  /** Số thứ tự chặng; nhóm "Cả ngày" thì null. */
+  index: number | null
+  title: string
+  time?: string
+  lines: Line[]
+}
+
+function groupsOf(
+  day: ItineraryDay,
+  stay: ItineraryResult["stay"],
+  lines: Line[],
+  vehicles: string | null
+): Group[] {
+  const home = stay?.name ?? "chỗ ở"
+  const byKey = new Map(lines.map((l) => [l.key, l]))
+  const groups: Group[] = []
+  let from = home
+  day.items.forEach((item, i) => {
+    if (item.type === "start") return
+    const back = item.type === "back"
+    const to = back ? `${home} (về chỗ ở)` : item.name
+    const mode = modeOf(item.travel_mode)
+    const leg = byKey.get(`leg-${i}`)
+    const own: Line[] = []
+    if (leg) own.push({ ...leg, name: "Đi lại" })
+    else if (item.travel_min > 0 || item.travel_km)
+      // Tự lái: chặng không tính tiền riêng, đã nằm trong "thuê xe + xăng" của ngày.
+      own.push({
+        key: `leg-${i}`,
+        icon: mode.icon,
+        iconCls: "text-trip-move",
+        name: "Đi lại",
+        note: [
+          vehicles ?? mode.label ?? null,
+          item.travel_min > 0 ? `${item.travel_min} phút` : null,
+          item.travel_km ? km(item.travel_km) : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        amount: null,
+        part: "transport",
+        label: day.cost?.rental_max ? "trong tiền thuê xe" : "—",
+      })
+    const place = byKey.get(`item-${i}`)
+    if (place)
+      own.push({
+        ...place,
+        name: item.type === "meal" ? "Ăn uống" : "Tham quan",
+      })
+    if (own.length)
+      groups.push({
+        key: `g-${i}`,
+        index: groups.length + 1,
+        title: `${from} → ${to}`,
+        time: item.start,
+        lines: own,
+      })
+    if (!back) from = item.name
+  })
+  const daily = lines.filter(
+    (l) => ["rental", "stay"].includes(l.key) || l.key.startsWith("extra-")
+  )
+  if (daily.length)
+    groups.push({ key: "g-day", index: null, title: "Cả ngày", lines: daily })
+  return groups
+}
+
+/** Cộng (thấp, cao) các khoản của một nhóm; khoản chưa có giá tính 0. */
+function sumOf(lines: Line[]): [number, number] {
+  return lines.reduce<[number, number]>(
+    ([lo, hi], l) => [lo + (l.amount?.[0] ?? 0), hi + (l.amount?.[1] ?? 0)],
+    [0, 0]
+  )
+}
+
+/** "Ngày N": tổng của ngày, chia theo khoản, rồi từng chặng "A → B" theo thứ tự đi. */
 function DayCost({
   day,
   stay,
@@ -521,7 +621,8 @@ function DayCost({
   stay: ItineraryResult["stay"]
   night: boolean
 }) {
-  const lines = linesOf(day, stay, night)
+  const vehicles = vehiclesOf(useTrip().party)
+  const lines = linesOf(day, stay, night, vehicles)
   // Không có chi phí ngày từ LLM thì cộng các khoản ở dưới (lấy giữa khoảng cho thanh chia).
   const total = day.cost
     ? rangeOf(day.cost.total_min, day.cost.total_max, day.cost.total)
@@ -547,46 +648,91 @@ function DayCost({
         <SplitBar split={split} />
       </div>
       {lines.length > 0 ? (
-        <ul className="divide-y divide-trip-line rounded-xl border border-trip-line bg-trip-sheet px-3.5">
-          {lines.map((l) => {
-            const Icon = l.icon
+        <ol className="relative grid gap-2.5 before:absolute before:top-4 before:bottom-4 before:left-[15px] before:w-0.5 before:bg-trip-line">
+          {groupsOf(day, stay, lines, vehicles).map((g) => {
+            const [lo, hi] = sumOf(g.lines)
             return (
               <li
-                key={l.key}
-                className="flex items-center gap-2.5 py-2 text-[13.5px]"
+                key={g.key}
+                className="relative grid grid-cols-[32px_1fr] gap-3"
               >
-                <Icon className={cn("size-4 shrink-0", l.iconCls)} />
-                <span className="grid min-w-0 flex-1">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate">{l.name}</span>
-                    {l.extra && (
-                      <span className="shrink-0 rounded bg-trip-sheet-2 px-1.5 text-[11px] font-semibold text-trip-ink-3">
-                        phát sinh
-                      </span>
-                    )}
-                  </span>
-                  {l.note && (
-                    <span className="truncate text-[12px] text-trip-ink-3">
-                      {l.note}
-                    </span>
-                  )}
-                </span>
                 <span
+                  aria-hidden
                   className={cn(
-                    "shrink-0 font-num",
-                    l.amount?.[1] ? "font-semibold" : "text-trip-ink-3"
+                    "relative z-10 mt-2.5 grid size-8 place-items-center rounded-full text-[13px] font-bold ring-4 ring-trip-paper",
+                    g.index == null
+                      ? "bg-trip-sheet-2 text-trip-ink-3"
+                      : "bg-trip-fill text-trip-on-fill"
                   )}
                 >
-                  {l.amount == null
-                    ? "chưa có giá"
-                    : l.amount[1] === 0
-                      ? "miễn phí"
-                      : moneyRange(...l.amount)}
+                  {g.index ?? "Σ"}
                 </span>
+                <div className="min-w-0 rounded-xl border border-trip-line bg-trip-sheet">
+                  <div className="flex items-start gap-3 border-b border-trip-line px-3.5 py-2.5">
+                    <span className="grid min-w-0 flex-1 gap-0.5">
+                      <span className="text-[14px] leading-snug font-semibold text-trip-ink">
+                        {g.title}
+                      </span>
+                      {g.time && (
+                        <span className="text-[12px] text-trip-ink-3">
+                          Tới lúc {g.time}
+                        </span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-right font-num text-[14px] font-bold">
+                      {hi > 0 ? moneyRange(lo, hi) : "0 đ"}
+                    </span>
+                  </div>
+                  <ul className="divide-y divide-trip-line/70 px-3.5">
+                    {g.lines.map((l) => {
+                      const Icon = l.icon
+                      return (
+                        <li
+                          key={l.key}
+                          className="flex items-center gap-2.5 py-2 text-[13px]"
+                        >
+                          <Icon className={cn("size-4 shrink-0", l.iconCls)} />
+                          <span className="grid min-w-0 flex-1">
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <span className="truncate text-trip-ink-2">
+                                {l.name}
+                              </span>
+                              {l.extra && (
+                                <span className="shrink-0 rounded bg-trip-sheet-2 px-1.5 text-[11px] font-semibold text-trip-ink-3">
+                                  phát sinh
+                                </span>
+                              )}
+                            </span>
+                            {l.note && (
+                              <span className="text-[12px] text-trip-ink-3">
+                                {l.note}
+                              </span>
+                            )}
+                          </span>
+                          <span
+                            className={cn(
+                              "shrink-0 font-num",
+                              l.amount?.[1]
+                                ? "font-semibold"
+                                : "text-trip-ink-3"
+                            )}
+                          >
+                            {l.label ??
+                              (l.amount == null
+                                ? "chưa có giá"
+                                : l.amount[1] === 0
+                                  ? "miễn phí"
+                                  : moneyRange(...l.amount))}
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
               </li>
             )
           })}
-        </ul>
+        </ol>
       ) : (
         <p className="rounded-xl border border-trip-line px-3.5 py-2.5 text-[13px] text-trip-ink-3">
           Ngày này chưa có khoản chi nào.

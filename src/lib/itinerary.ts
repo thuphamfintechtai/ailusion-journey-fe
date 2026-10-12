@@ -86,6 +86,11 @@ export type ItineraryItem = {
   price_max?: number | null
   /** Cùng chặng này nếu đi bằng phương tiện khác (phút). Lộ trình cũ không có. */
   travel_alt?: TravelAlt[] | null
+  /** Giá mỗi người (khoảng Google ghi / giá ước); `price_pp_max` null = "Từ …". */
+  price_pp_min?: number | null
+  price_pp_max?: number | null
+  /** Giải thích giá; chợ / mua sắm: không ước tiền mua sắm. */
+  price_note?: string | null
 }
 
 /** Phương tiện để so thời gian đi; không có xe buýt / phương tiện công cộng. */
@@ -218,6 +223,10 @@ export type ItineraryResult = {
   destination: string
   start_date: string
   days: number
+  /** Số người đi (lộ trình cũ không có). */
+  group_size?: number
+  /** VD "2 người · 1 xe máy (2 người/xe)". */
+  travel_party?: string | null
   questions: ItineraryQuestion[]
   profile: {
     group: string

@@ -29,7 +29,7 @@ import {
 import { cn } from "@/lib/utils"
 
 import { PlanPanel } from "./plan-panel"
-import { trieuRange } from "./plan-shared"
+import { forPeople, trieuRange } from "./plan-shared"
 
 const FIELD_NAMES: Record<string, string> = {
   group_type: "đi cùng ai",
@@ -207,6 +207,7 @@ function Options({
             on={o.id === option.id}
             recommended={o.id === chosen}
             onSelect={() => setSelected(o.id)}
+            groupSize={result.group_size}
           />
         ))}
       </div>
@@ -295,11 +296,13 @@ function OptionCard({
   on,
   recommended,
   onSelect,
+  groupSize,
 }: {
   option: ItineraryResult["options"][number]
   on: boolean
   recommended: boolean
   onSelect: () => void
+  groupSize?: number
 }) {
   const cb = o.cost_breakdown
   // Có khoảng "từ–đến" thì hiện khoảng, lộ trình cũ thì một con số.
@@ -349,7 +352,7 @@ function OptionCard({
 
       <span className="grid gap-0.5">
         <span className="text-[11.5px] font-medium text-trip-ink-3">
-          Ước tính cả đoàn
+          Ước tính {forPeople(groupSize)}
         </span>
         <span
           className="flex items-baseline gap-1 text-trip-ink"

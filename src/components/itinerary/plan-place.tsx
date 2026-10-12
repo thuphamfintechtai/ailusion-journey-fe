@@ -36,7 +36,7 @@ import { useAuth } from "@/lib/auth"
 import { money, type ItineraryItem } from "@/lib/itinerary"
 import { cn } from "@/lib/utils"
 
-import { moneyRange, rangeOf } from "./plan-shared"
+import { priceText, useTrip } from "./plan-shared"
 
 // ---------------------------------------------------------------- tải dữ liệu
 // Cache theo lời hứa, dùng chung cả module: hai effect (StrictMode) hay hai chỗ cùng hỏi một
@@ -552,7 +552,7 @@ function TitleBlock({
   const category = detail?.category || item.category
   const rating = detail?.rating ?? item.rating
   const count = detail?.reviews_count ?? item.reviews
-  const price = rangeOf(item.price_min, item.price_max, item.price)
+  const { groupSize } = useTrip()
   const level =
     typeof detail?.price === "number"
       ? money(detail.price)
@@ -599,11 +599,7 @@ function TitleBlock({
         </span>
         <span className={cn(chip, "bg-trip-sheet-2 text-trip-ink-2")}>
           <Wallet className="size-3.5" />
-          {price == null
-            ? "chưa có giá"
-            : price[1] === 0
-              ? "miễn phí"
-              : `${price[0] !== price[1] ? "~" : ""}${moneyRange(...price)} cả đoàn`}
+          {priceText(item, groupSize)}
         </span>
         {level && (
           <span className={cn(chip, "bg-trip-sheet-2 text-trip-ink-2")}>

@@ -5,11 +5,13 @@
 import * as React from "react"
 import { Bike, Bus, Car, CarTaxiFront, Footprints, Route } from "lucide-react"
 
-import type {
-  AltMode,
-  ItineraryDay,
-  TravelAlt,
-  TravelMode,
+import {
+  money,
+  type AltMode,
+  type ItineraryDay,
+  type ItineraryItem,
+  type TravelAlt,
+  type TravelMode,
 } from "@/lib/itinerary"
 import { cn } from "@/lib/utils"
 
@@ -184,4 +186,39 @@ export function DayPills({
       })}
     </div>
   )
+}
+
+/** Số người và cách đi của lộ trình, dùng chung cho các tab (lộ trình cũ không có). */
+export const TripContext = React.createContext<{
+  groupSize?: number
+  party?: string | null
+}>({})
+
+export function useTrip() {
+  return React.useContext(TripContext)
+}
+
+/** "cho 2 người"; chưa biết số người thì "cả nhóm". */
+export function forPeople(n?: number) {
+  return n ? `cho ${n} người` : "cả nhóm"
+}
+
+/** Phần xe của `travel_party`: "2 người · 1 xe máy (2 người/xe)" -> "1 xe máy". */
+export function vehiclesOf(party?: string | null) {
+  return party?.split(" · ")[1]?.replace(/\s*\(.*\)$/, "") ?? null
+}
+
+/** Giá ngắn của một điểm: mỗi người nếu có khoảng; chợ / mua sắm thì không ước. */
+export function priceText(item: ItineraryItem, groupSize?: number): string {
+  if (item.price_note && item.price_pp_min == null && !item.price)
+    return "tuỳ nhu cầu mua sắm"
+  if (item.price_pp_min != null) {
+    if (item.price_pp_max == null) return `từ ${money(item.price_pp_min)}/người`
+    const pp = moneyRange(item.price_pp_min, item.price_pp_max)
+    return `${item.price_pp_min !== item.price_pp_max ? "~" : ""}${pp}/người`
+  }
+  const price = rangeOf(item.price_min, item.price_max, item.price)
+  if (price == null) return "chưa có giá"
+  if (price[1] === 0) return "miễn phí"
+  return `${price[0] !== price[1] ? "~" : ""}${moneyRange(...price)} ${forPeople(groupSize)}`
 }

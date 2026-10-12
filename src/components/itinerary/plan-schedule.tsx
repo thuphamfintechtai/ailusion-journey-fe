@@ -23,7 +23,10 @@ import {
   km,
   modeOf,
   moneyRange,
+  priceText,
   rangeOf,
+  useTrip,
+  vehiclesOf,
 } from "./plan-shared"
 
 const STATUS: Record<ItineraryDay["status"], { label: string; cls: string }> = {
@@ -129,13 +132,14 @@ export function ScheduleTab({
 /** Chặng từ điểm trước tới điểm này; phần nào chưa biết thì bỏ. */
 function LegRow({ item }: { item: ItineraryItem }) {
   const mode = modeOf(item.travel_mode)
+  const vehicles = vehiclesOf(useTrip().party)
   const cost = rangeOf(
     item.travel_cost_min,
     item.travel_cost_max,
     item.travel_cost
   )
   const parts = [
-    mode.label,
+    vehicles ?? mode.label,
     item.travel_min > 0 ? `${item.travel_min} phút` : null,
     item.travel_km != null && item.travel_km > 0 ? km(item.travel_km) : null,
     cost && cost[1] > 0 ? `~${moneyRange(...cost)}` : null,
@@ -175,7 +179,7 @@ function PlaceCard({
       ? `${item.rating.toFixed(1)}★${item.reviews ? ` (${item.reviews.toLocaleString("vi-VN")})` : ""}`
       : null,
   ].filter(Boolean)
-  const price = rangeOf(item.price_min, item.price_max, item.price)
+  const { groupSize } = useTrip()
   return (
     <button
       type="button"
@@ -200,11 +204,7 @@ function PlaceCard({
           </span>
         )}
         <span className="flex items-center gap-1.5 text-[12.5px] text-trip-ink-3">
-          {price == null
-            ? "chưa có giá"
-            : price[1] === 0
-              ? "miễn phí"
-              : `${price[0] !== price[1] ? "~" : ""}${moneyRange(...price)} cả đoàn`}
+          {priceText(item, groupSize)}
           {/* Có chờ mở cửa thì để dấu nhỏ, chi tiết xem trong ngăn. */}
           {item.wait_min > 0 && (
             <TriangleAlert
