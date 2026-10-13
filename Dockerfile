@@ -26,7 +26,11 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # NEXT_PUBLIC_* vars are inlined at build time — pass them with --build-arg.
 ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_VIETMAP_KEY=
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_VIETMAP_KEY=${NEXT_PUBLIC_VIETMAP_KEY}
 RUN pnpm build
 
 # ---- runner: minimal production image ----
