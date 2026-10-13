@@ -17,8 +17,9 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 ENV HUSKY=0
+# postinstall cần scripts/copy-map-worker.mjs, file đó chỉ có ở stage builder.
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile
+    pnpm install --frozen-lockfile --ignore-scripts
 
 # ---- builder: next build (standalone output) ----
 FROM base AS builder
@@ -31,7 +32,7 @@ ARG NEXT_PUBLIC_VIETMAP_KEY=
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_VIETMAP_KEY=${NEXT_PUBLIC_VIETMAP_KEY}
-RUN pnpm build
+RUN node scripts/copy-map-worker.mjs && pnpm build
 
 # ---- runner: minimal production image ----
 FROM node:${NODE_VERSION} AS runner
