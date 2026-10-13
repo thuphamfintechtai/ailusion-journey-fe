@@ -40,7 +40,7 @@ export function SiteNav() {
           {loading ? null : user ? (
             <>
               <Button asChild variant="ghost" className="hidden sm:inline-flex">
-                <Link href="/plan">Lập lộ trình</Link>
+                <Link href="/chat?form=1">Lập lộ trình</Link>
               </Button>
               <Button asChild>
                 <Link href="/chat">Mở trợ lý</Link>

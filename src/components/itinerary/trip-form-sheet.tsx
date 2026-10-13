@@ -12,6 +12,7 @@
 import * as React from "react"
 import { Dialog } from "radix-ui"
 import {
+  CircleAlert,
   LoaderCircle,
   Minus,
   Plus,
@@ -37,6 +38,8 @@ import {
   type TripForm,
 } from "@/lib/itinerary"
 import { cn } from "@/lib/utils"
+
+import { conflictsOf, type Conflict } from "./trip-conflicts"
 
 const MAX_DAYS = 7
 const PLACES = [
@@ -478,6 +481,9 @@ export function TripFormSheet({
   const [form, setForm] = React.useState<TripForm>(emptyForm)
   const [prefillState, setPrefillState] = React.useState<Prefill>("idle")
   const readKey = React.useRef<string | null>(null)
+  // Điều trợ lý đã ghi từ chat, để hỏi lại khi form khác đi; mâu thuẫn người dùng chọn giữ nguyên.
+  const [chatInfo, setChatInfo] = React.useState<TripInfo | null>(null)
+  const [kept, setKept] = React.useState<string[]>([])
   const set = <K extends keyof TripForm>(key: K, value: TripForm[K]) =>
     setForm((f) => ({ ...f, [key]: value }))
 
@@ -486,6 +492,14 @@ export function TripFormSheet({
     !form.destination.trim() && "điểm đến",
     (days < 1 || days > MAX_DAYS) && `ngày về (tối đa ${MAX_DAYS} ngày)`,
   ].filter((x): x is string => Boolean(x))
+  const conflicts = conflictsOf(form, chatInfo).filter(
+    (c) => !kept.includes(c.id)
+  )
+  function resolve(c: Conflict, i: number) {
+    const o = c.options[i]
+    if (o.apply) setForm(o.apply)
+    else setKept((k) => [...k, c.id])
+  }
   const budgetMillion = form.budget
     ? Math.round(form.budget / 100_000) / 10
     : null
@@ -507,6 +521,7 @@ export function TripFormSheet({
         const state = await loadPrefill()
         if (cancelled || !state) return
         finished = true
+        setChatInfo(state.info)
         setForm((f) => fromTripInfo(f, state.info).form)
         setPrefillState({
           filled: fromTripInfo(emptyForm(), state.info).filled,
@@ -525,7 +540,7 @@ export function TripFormSheet({
 
   function submit(event: React.FormEvent) {
     event.preventDefault()
-    if (missing.length) return
+    if (missing.length || conflicts.length) return
     onPlan(toRequest(form), toTripInfo(form))
     onOpenChange(false)
   }
@@ -1025,6 +1040,9 @@ export function TripFormSheet({
             </div>
 
             <footer className="grid gap-2 border-t border-trip-line bg-trip-sheet px-5 py-3">
+              {conflicts.length > 0 && (
+                <ConflictList items={conflicts} onPick={resolve} />
+              )}
               {missing.length > 0 && (
                 <p
                   role="status"
@@ -1047,14 +1065,17 @@ export function TripFormSheet({
                 <div className="flex shrink-0 items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setForm(emptyForm())}
+                    onClick={() => {
+                      setForm(emptyForm())
+                      setKept([])
+                    }}
                     className="min-h-11 rounded-[10px] px-2.5 text-sm font-semibold text-trip-ink-3 outline-none hover:text-trip-ink max-sm:hidden"
                   >
                     Làm lại
                   </button>
                   <button
                     type="submit"
-                    disabled={missing.length > 0}
+                    disabled={missing.length > 0 || conflicts.length > 0}
                     className="inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-trip-fill px-5 text-[15px] font-semibold text-trip-on-fill outline-none hover:bg-trip-fill/90 focus-visible:ring-[3px] focus-visible:ring-trip-sky/30 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Route className="size-4" />
@@ -1067,6 +1088,49 @@ export function TripFormSheet({
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  )
+}
+
+/** Các chỗ chưa khớp: mỗi chỗ một dòng, bấm chọn cách xử lý thì dòng đó biến mất. */
+function ConflictList({
+  items,
+  onPick,
+}: {
+  items: Conflict[]
+  onPick: (c: Conflict, option: number) => void
+}) {
+  return (
+    <div
+      role="alert"
+      className="grid max-h-[34dvh] gap-2 overflow-y-auto rounded-xl border border-trip-warn-dot/40 bg-trip-warn-bg p-3"
+    >
+      <p className="flex items-center gap-2 text-[13.5px] font-bold text-trip-ink">
+        <CircleAlert className="size-4 shrink-0 text-trip-warn-dot" />
+        {items.length} chỗ chưa khớp — chọn giúp mình trước khi lập lộ trình
+      </p>
+      {items.map((c) => (
+        <div key={c.id} className="grid gap-1.5">
+          <p className="text-[13.5px] leading-snug text-trip-ink-2">{c.text}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {c.options.map((o, i) => (
+              <button
+                key={o.label}
+                type="button"
+                onClick={() => onPick(c, i)}
+                className={cn(
+                  "min-h-8 rounded-lg px-3 text-[13px] font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-trip-sky/30",
+                  o.keep
+                    ? "border border-trip-line-2 bg-trip-sheet text-trip-ink-2 hover:border-trip-ink-3"
+                    : "bg-trip-fill text-trip-on-fill hover:bg-trip-fill/90"
+                )}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 

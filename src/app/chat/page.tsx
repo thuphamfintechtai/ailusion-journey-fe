@@ -61,6 +61,13 @@ export default function ChatPage() {
     if (!loading && !token) router.replace("/login")
   }, [loading, token, router])
 
+  // "/chat?form=1" (nút "Lập lộ trình"): mở sẵn form rồi bỏ tham số khỏi địa chỉ.
+  React.useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("form") !== "1") return
+    setFormOpen(true)
+    router.replace("/chat")
+  }, [router])
+
   const refreshThreads = React.useCallback(async () => {
     if (!token) return
     try {
