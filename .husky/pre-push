@@ -1,0 +1,9 @@
+#!/bin/sh
+# Chặn push thẳng lên main: main chỉ để deploy, code lên main qua PR dev -> main trên GitHub.
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "Không push thẳng lên main. Push lên dev rồi mở PR dev -> main để deploy." >&2
+    exit 1
+  fi
+done
+exit 0
