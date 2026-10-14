@@ -1,7 +1,9 @@
 # CI/CD frontend (Next.js)
 #
-# - Pull request / push: eslint, typecheck, prettier, next build.
-# - Push lên main (sau khi CI xanh): SSH vào server, cập nhật code đúng commit vừa test, chạy
+# Nhánh: lập trình trên `dev` (mặc định), `main` chỉ để deploy (merge dev -> main qua PR).
+#
+# - Pull request / push lên dev hoặc main: eslint, typecheck, prettier, next build.
+# - Push / merge vào main (sau khi CI xanh): SSH vào server, cập nhật code đúng commit vừa test, chạy
 #   lại `compose.homelab.yaml` rồi chờ container `ailusion-web` healthy (lỗi thì in log và báo đỏ).
 #
 # Cần cấu hình trong repo (Settings → Secrets and variables → Actions):
@@ -15,7 +17,7 @@ name: CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [dev, main]
   pull_request:
   workflow_dispatch:
 
