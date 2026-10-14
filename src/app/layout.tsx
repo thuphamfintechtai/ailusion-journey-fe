@@ -1,47 +1,75 @@
 import type { Metadata } from "next"
-import {
-  Barlow_Condensed,
-  Be_Vietnam_Pro,
-  Dancing_Script,
-  JetBrains_Mono,
-  Raleway,
-} from "next/font/google"
+import localFont from "next/font/local"
 
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/lib/auth"
 
 import "./globals.css"
 
+// Font nằm trong repo (SIL OFL, src/fonts). next/font/google tải font lúc build; Google đôi khi
+// trả URL có dấu & và Turbopack của Next 16 làm next build fail.
 // Raleway cho tiêu đề, Be Vietnam Pro cho chữ thường (dấu tiếng Việt rõ), Dancing Script cho vài
 // dòng chữ viết tay trên ảnh.
-const body = Be_Vietnam_Pro({
+const body = localFont({
+  src: [
+    {
+      path: "../fonts/BeVietnamPro-Regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../fonts/BeVietnamPro-Medium.ttf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../fonts/BeVietnamPro-SemiBold.ttf",
+      weight: "600",
+      style: "normal",
+    },
+    { path: "../fonts/BeVietnamPro-Bold.ttf", weight: "700", style: "normal" },
+  ],
   variable: "--font-body",
-  subsets: ["latin", "vietnamese"],
-  weight: ["400", "500", "600", "700"],
+  display: "swap",
 })
 
-const heading = Raleway({
+const heading = localFont({
+  src: "../fonts/Raleway-Variable.ttf",
   variable: "--font-heading",
-  subsets: ["latin", "vietnamese"],
-  weight: ["600", "700", "800"],
+  weight: "100 900",
+  display: "swap",
 })
 
-const hand = Dancing_Script({
+const hand = localFont({
+  src: "../fonts/DancingScript-Variable.ttf",
   variable: "--font-hand",
-  subsets: ["latin", "vietnamese"],
-  weight: ["600", "700"],
+  weight: "400 700",
+  display: "swap",
 })
 
 // Số lớn trên trang lộ trình (giá, giờ, ngày trên tờ lịch) — chữ hẹp, dễ đọc khi in to.
-const numeric = Barlow_Condensed({
+const numeric = localFont({
+  src: [
+    {
+      path: "../fonts/BarlowCondensed-Medium.ttf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../fonts/BarlowCondensed-SemiBold.ttf",
+      weight: "600",
+      style: "normal",
+    },
+  ],
   variable: "--font-numeric",
-  subsets: ["latin", "vietnamese"],
-  weight: ["500", "600"],
+  display: "swap",
 })
 
-const code = JetBrains_Mono({
+const code = localFont({
+  src: "../fonts/JetBrainsMono-Variable.ttf",
   variable: "--font-code",
-  subsets: ["latin", "vietnamese"],
+  weight: "100 800",
+  display: "swap",
 })
 
 export const metadata: Metadata = {
