@@ -17,6 +17,8 @@ type Props = {
   threadId: string | null
   /** Điền sẵn form từ cuộc trò chuyện; xem `TripFormSheet`. */
   tripPrefill: { key: string; load: () => Promise<TripState> } | null
+  /** Form đã gửi ở lần lập lộ trình gần nhất của hội thoại (đọc từ tin nhắn). */
+  lastForm: TripForm | null
   /** Form "Điền thông tin chuyến đi" đang mở. Trang chat giữ, để tự mở khi trợ lý báo. */
   formOpen: boolean
   onFormOpenChange: (open: boolean) => void
@@ -32,6 +34,7 @@ export function MessageInput({
   busy,
   threadId,
   tripPrefill,
+  lastForm,
   formOpen,
   onFormOpenChange,
   onPlan,
@@ -139,6 +142,8 @@ export function MessageInput({
       <TripFormSheet
         key={threadId ?? "new"}
         prefill={tripPrefill}
+        saved={lastForm}
+        draftKey={threadId ?? "new"}
         open={formOpen}
         onOpenChange={onFormOpenChange}
         onPlan={onPlan}

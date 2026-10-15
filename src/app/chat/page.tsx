@@ -443,6 +443,10 @@ export default function ChatPage() {
     threadId && turnCount > 0
       ? `${threadId}:${turnCount}:${trip ? "event" : "fetch"}`
       : null
+  // Form đầy đủ của lần lập lộ trình gần nhất (BE lưu cùng tin nhắn): mở lại form thì điền đủ mọi
+  // ô (mục đích, giờ, nghỉ trưa, câu trả lời hỏi lại…), không chỉ phần trợ lý chat nhớ.
+  const lastForm =
+    [...messages].reverse().find((m) => m.plan?.form)?.plan?.form ?? null
   const tripPrefill =
     threadId && prefillKey
       ? {
@@ -608,6 +612,7 @@ export default function ChatPage() {
           busy={busy}
           threadId={threadId}
           tripPrefill={tripPrefill}
+          lastForm={lastForm}
           formOpen={formOpen}
           onFormOpenChange={setFormOpen}
           onPlan={startPlan}
