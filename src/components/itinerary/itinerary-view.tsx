@@ -313,7 +313,8 @@ function OptionCard({
   const [amount, unit] = text.endsWith(" tr")
     ? [text.slice(0, -3), "triệu"]
     : [text, ""]
-  const strengths = o.better_at.length ? o.better_at : ["lịch dự phòng"]
+  // Không hơn hẳn phương án nào ở mặt nào thì không gắn nhãn (trước đây ghi nhầm "lịch dự phòng").
+  const strengths = o.better_at
   return (
     <button
       type="button"
@@ -373,17 +374,19 @@ function OptionCard({
         </span>
       </span>
 
-      <span className="flex flex-wrap gap-1.5">
-        {strengths.map((s) => (
-          <span
-            key={s}
-            className="inline-flex items-center gap-1 rounded-full bg-trip-sheet-2 px-2 py-0.5 text-[11.5px] font-medium text-trip-ink-2"
-          >
-            <Check className="size-3 text-trip-jade" strokeWidth={2.6} />
-            {s}
-          </span>
-        ))}
-      </span>
+      {strengths.length > 0 && (
+        <span className="flex flex-wrap gap-1.5">
+          {strengths.map((s) => (
+            <span
+              key={s}
+              className="inline-flex items-center gap-1 rounded-full bg-trip-sheet-2 px-2 py-0.5 text-[11.5px] font-medium text-trip-ink-2"
+            >
+              <Check className="size-3 text-trip-jade" strokeWidth={2.6} />
+              {s}
+            </span>
+          ))}
+        </span>
+      )}
     </button>
   )
 }
