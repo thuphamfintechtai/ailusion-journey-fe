@@ -13,6 +13,8 @@ services:
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://journey.ailusion.io.vn}
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://journey-api.ailusion.io.vn}
         NEXT_PUBLIC_VIETMAP_KEY: ${NEXT_PUBLIC_VIETMAP_KEY:-}
+        NEXT_PUBLIC_LANGSMITH_PROJECT_URL: ${NEXT_PUBLIC_LANGSMITH_PROJECT_URL:-}
+        NEXT_PUBLIC_LANGFUSE_PROJECT_URL: ${NEXT_PUBLIC_LANGFUSE_PROJECT_URL:-}
     image: ailusion-journey-fe:homelab
     container_name: ailusion-web
     restart: unless-stopped

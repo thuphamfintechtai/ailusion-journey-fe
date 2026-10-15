@@ -49,9 +49,15 @@ export const NODES: Record<string, NodeMeta> = {
     marker: "square",
     sources: ["check_opening_hours", "check_place_needs"],
   },
+  chot_nhanh: {
+    label: "Chia chỗ cho 3 phương án",
+    phase: "schedule",
+    marker: "diamond",
+    sources: ["distance_matrix"],
+  },
   xac_minh: {
-    label: "Experience + Budget xác minh",
-    phase: "search",
+    label: "Experience + Budget xác minh chỗ sắp xếp lịch",
+    phase: "schedule",
     marker: "circle",
   },
   cham: {

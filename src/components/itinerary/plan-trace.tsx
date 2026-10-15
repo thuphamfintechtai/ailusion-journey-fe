@@ -86,6 +86,7 @@ const STEP_ICONS: Record<string, LucideIcon> = {
   xep_lich: CalendarClock,
   kiem_lich: Timer,
   xep_hang: ListOrdered,
+  chot_nhanh: CalendarRange,
   lap_phuong_an: GitFork,
   ghep: Layers,
   quyet_dinh: BadgeCheck,

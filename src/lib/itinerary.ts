@@ -255,6 +255,8 @@ export type ItineraryQuestion = {
 
 export type ItineraryResult = {
   thread_id: string
+  /** Run gốc trên LangSmith của lượt này (để mở thẳng trace khi debug). */
+  trace_run_id?: string | null
   status: "ok" | "need_info"
   destination: string
   start_date: string
