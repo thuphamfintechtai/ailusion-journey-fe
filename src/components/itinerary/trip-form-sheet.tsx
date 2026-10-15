@@ -112,6 +112,41 @@ function emptyForm(): TripForm {
 }
 
 /** Bỏ ô trống trước khi gửi: LLM service coi ô có trong body là "user đã điền". */
+const DRAFT_PREFIX = "ailusion:trip-draft:"
+
+/** Form đã gửi (chỉ ô đã điền) -> form đủ ô để hiện lại. */
+function fromSaved(saved: TripForm | null | undefined): TripForm | null {
+  return saved ? { ...emptyForm(), ...saved } : null
+}
+
+function readDraft(key?: string): TripForm | null {
+  if (!key) return null
+  try {
+    const raw = window.localStorage.getItem(DRAFT_PREFIX + key)
+    return raw ? { ...emptyForm(), ...(JSON.parse(raw) as TripForm) } : null
+  } catch {
+    return null
+  }
+}
+
+function writeDraft(key: string | undefined, form: TripForm) {
+  if (!key) return
+  try {
+    window.localStorage.setItem(DRAFT_PREFIX + key, JSON.stringify(form))
+  } catch {
+    // Trình duyệt chặn lưu (chế độ riêng tư…): bỏ qua, chỉ mất bản nháp.
+  }
+}
+
+function clearDraft(key?: string) {
+  if (!key) return
+  try {
+    window.localStorage.removeItem(DRAFT_PREFIX + key)
+  } catch {
+    // như trên
+  }
+}
+
 function toRequest(f: TripForm): TripForm {
   const out: Record<string, unknown> = {}
   const musts = (f.must_visits ?? [])
@@ -508,21 +543,44 @@ export function TripFormSheet({
   onOpenChange,
   onPlan,
   prefill,
+  saved,
+  draftKey,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   /** "Lập lộ trình": form gửi pipeline (chỉ ô đã điền), và bản TripInfo để trợ lý chat nhớ. */
   onPlan: (form: TripForm, info: TripInfo) => void
   prefill?: { key: string; load: () => Promise<TripState> } | null
+  /** Form đã gửi lần lập lộ trình gần nhất (BE lưu): điền lại đủ mọi ô khi mở lại. */
+  saved?: TripForm | null
+  /** Khoá bản nháp trong trình duyệt (mã hội thoại, "new" khi chưa có). */
+  draftKey?: string
 }) {
-  const [form, setForm] = React.useState<TripForm>(emptyForm)
+  // Bản nháp chưa gửi (đóng form / tải lại trang không mất) > form đã gửi lần trước > form trống.
+  const [form, setForm] = React.useState<TripForm>(
+    () => readDraft(draftKey) ?? fromSaved(saved) ?? emptyForm()
+  )
+  // Người dùng đã sửa form (từ đó lưu bản nháp, không bị form đã gửi ghi đè).
+  const [touched, setTouched] = React.useState(false)
+  // Tin nhắn tải sau khi form đã dựng (mở hội thoại cũ): chưa sửa gì thì lấy form đã gửi.
+  const [seenSaved, setSeenSaved] = React.useState(saved)
+  if (saved !== seenSaved) {
+    setSeenSaved(saved)
+    const next = fromSaved(saved)
+    if (!touched && next && !readDraft(draftKey)) setForm(next)
+  }
+  React.useEffect(() => {
+    if (touched) writeDraft(draftKey, form)
+  }, [form, draftKey, touched])
   const [prefillState, setPrefillState] = React.useState<Prefill>("idle")
   const readKey = React.useRef<string | null>(null)
   // Điều trợ lý đã ghi từ chat, để hỏi lại khi form khác đi; mâu thuẫn người dùng chọn giữ nguyên.
   const [chatInfo, setChatInfo] = React.useState<TripInfo | null>(null)
   const [kept, setKept] = React.useState<string[]>([])
-  const set = <K extends keyof TripForm>(key: K, value: TripForm[K]) =>
+  const set = <K extends keyof TripForm>(key: K, value: TripForm[K]) => {
+    setTouched(true)
     setForm((f) => ({ ...f, [key]: value }))
+  }
 
   const days = daysBetween(form.start_date, form.end_date)
   // Bắt buộc trước khi lập lộ trình: đi đâu, ngày đi / về, mấy người, ngân sách bao nhiêu.
@@ -539,6 +597,7 @@ export function TripFormSheet({
   )
   function resolve(c: Conflict, i: number) {
     const o = c.options[i]
+    setTouched(true)
     if (o.apply) setForm(o.apply)
     else setKept((k) => [...k, c.id])
   }
@@ -586,6 +645,10 @@ export function TripFormSheet({
     event.preventDefault()
     if (missing.length || conflicts.length) return
     onPlan(toRequest(form), toTripInfo(form))
+    // Đã gửi: form nằm trong tin nhắn lộ trình (BE lưu), bỏ bản nháp.
+    clearDraft(draftKey)
+    clearDraft("new")
+    setTouched(false)
     onOpenChange(false)
   }
 
@@ -677,6 +740,7 @@ export function TripFormSheet({
                       onChange={(e) => {
                         const start = e.target.value
                         if (!start) return
+                        setTouched(true)
                         setForm((f) => ({
                           ...f,
                           start_date: start,
@@ -1192,6 +1256,8 @@ export function TripFormSheet({
                   <button
                     type="button"
                     onClick={() => {
+                      clearDraft(draftKey)
+                      setTouched(false)
                       setForm(emptyForm())
                       setKept([])
                     }}
