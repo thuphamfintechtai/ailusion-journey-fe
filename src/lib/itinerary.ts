@@ -196,6 +196,8 @@ export type ItineraryDay = {
   route_precision?: number
   /** Một dòng về phạm vi địa lý của ngày. */
   area_note?: string | null
+  /** Bữa không xếp / tuỳ chọn và lý do (VD bắt đầu 10:00 nên bữa sáng tuỳ chọn). */
+  meal_notes?: string[]
   /** Ngày âm lịch, VD "10/9". */
   lunar?: string | null
   holiday?: string | null
