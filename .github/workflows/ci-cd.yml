@@ -146,6 +146,10 @@ jobs:
           DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/home/zuzu/ailusion-journey-fe' }}
           DEPLOY_SHA: ${{ github.sha }}
           CONTAINER: ailusion-web
+          # Server tự build image (compose --build): truyền biến NEXT_PUBLIC_* của GitHub vào lệnh
+          # build, không phải sửa tay .env.homelab. Trống thì dùng giá trị trong .env.homelab.
+          LANGSMITH_URL: ${{ vars.NEXT_PUBLIC_LANGSMITH_PROJECT_URL }}
+          LANGFUSE_URL: ${{ vars.NEXT_PUBLIC_LANGFUSE_PROJECT_URL }}
         run: |
           set -euo pipefail
           curl -fsSL -o /tmp/cloudflared "https://github.com/cloudflare/cloudflared/releases/download/2026.5.1/cloudflared-linux-amd64"
@@ -173,11 +177,14 @@ jobs:
             -o StrictHostKeyChecking=accept-new \
             -o UserKnownHostsFile=~/.ssh/known_hosts \
             "$DEPLOY_USER@127.0.0.1" \
-            bash -s -- "$DEPLOY_DIR" "$DEPLOY_SHA" "$CONTAINER" <<'REMOTE'
+            bash -s -- "$DEPLOY_DIR" "$DEPLOY_SHA" "$CONTAINER" "$LANGSMITH_URL" "$LANGFUSE_URL" <<'REMOTE'
           set -euo pipefail
           DEPLOY_DIR=$1
           DEPLOY_SHA=$2
           CONTAINER=$3
+          # Biến shell được compose ưu tiên hơn --env-file.
+          [ -n "${4:-}" ] && export NEXT_PUBLIC_LANGSMITH_PROJECT_URL="$4"
+          [ -n "${5:-}" ] && export NEXT_PUBLIC_LANGFUSE_PROJECT_URL="$5"
           cd "$DEPLOY_DIR"
           test -f .env.homelab || { echo "Thiếu $DEPLOY_DIR/.env.homelab"; exit 1; }
           if [ -z "$DEPLOY_SHA" ]; then
