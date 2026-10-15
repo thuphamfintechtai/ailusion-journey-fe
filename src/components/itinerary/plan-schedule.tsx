@@ -5,6 +5,7 @@
 import * as React from "react"
 import {
   BedDouble,
+  Coffee,
   ChevronRight,
   ExternalLink,
   MapPin,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react"
 
 import {
+  money,
   mustTimeText,
   type ItineraryDay,
   type ItineraryItem,
@@ -105,9 +107,21 @@ export function ScheduleTab({
               {item.type === "visit" || item.type === "meal" ? (
                 <PlaceCard item={item} onOpen={() => setOpen(item)} />
               ) : (
-                <p className="flex items-center gap-1.5 text-[15px] font-semibold">
-                  <BedDouble className="size-4 text-trip-ink-3" />
+                <p className="flex flex-wrap items-center gap-1.5 text-[15px] font-semibold">
+                  {item.type === "rest" && item.price_by?.includes("ly") ? (
+                    <Coffee className="size-4 text-trip-ink-3" />
+                  ) : (
+                    <BedDouble className="size-4 text-trip-ink-3" />
+                  )}
                   {item.name}
+                  {item.type === "rest" && (
+                    <span className="font-num text-[13px] font-normal text-trip-ink-3">
+                      → {item.end}
+                      {item.price
+                        ? ` · ~${money(item.price)} (${item.price_by?.replace("ước: ", "")})`
+                        : ""}
+                    </span>
+                  )}
                 </p>
               )}
             </li>

@@ -11,6 +11,7 @@ import {
 } from "@/components/chat/message-list"
 import { Brand } from "@/components/brand"
 import { ThreadList } from "@/components/chat/thread-list"
+import { TraceIds } from "@/components/trace-ids"
 import { Button } from "@/components/ui/button"
 import {
   ApiError,
@@ -552,7 +553,15 @@ export default function ChatPage() {
                   </span>
                 </>
               ) : turnCount > 0 ? (
-                `${turnCount} câu hỏi · Ailusion trợ lý du lịch`
+                <>
+                  {`${turnCount} câu hỏi · Ailusion trợ lý du lịch`}
+                  {threadId && (
+                    <TraceIds
+                      threadId={threadId}
+                      className="ml-2 max-sm:hidden"
+                    />
+                  )}
+                </>
               ) : (
                 "Hỏi gì cũng được về chuyến đi của bạn"
               )}

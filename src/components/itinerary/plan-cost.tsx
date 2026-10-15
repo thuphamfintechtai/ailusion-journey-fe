@@ -467,7 +467,7 @@ function linesOf(
         icon: mode.icon,
         iconCls: "text-trip-move",
         name: `${from} → ${
-          item.type === "back"
+          item.type === "back" || (item.type === "rest" && !item.place_id)
             ? `${stay?.name ?? "chỗ ở"} (về chỗ ở)`
             : item.name
         }`,
@@ -481,6 +481,19 @@ function linesOf(
         amount: travel,
         part: "transport",
       })
+    }
+    if (item.type === "rest" && item.place_id) {
+      from = item.name
+      if (item.price)
+        lines.push({
+          key: `item-${i}`,
+          icon: Utensils,
+          iconCls: "text-trip-food",
+          name: item.name,
+          note: item.price_by?.replace("ước: ", "") ?? undefined,
+          amount: rangeOf(null, null, item.price),
+          part: item.price_by?.includes("ly") ? "food" : "stay",
+        })
     }
     if (item.type === "visit" || item.type === "meal") {
       from = item.name
@@ -555,7 +568,9 @@ function groupsOf(
   let from = home
   day.items.forEach((item, i) => {
     if (item.type === "start") return
-    const back = item.type === "back"
+    // Nghỉ trưa cũng là một chặng về chỗ ở.
+    const back =
+      item.type === "back" || (item.type === "rest" && !item.place_id)
     const to = back ? `${home} (về chỗ ở)` : item.name
     const mode = modeOf(item.travel_mode)
     const leg = byKey.get(`leg-${i}`)
@@ -583,7 +598,12 @@ function groupsOf(
     if (place)
       own.push({
         ...place,
-        name: item.type === "meal" ? "Ăn uống" : "Tham quan",
+        name:
+          item.type === "meal"
+            ? "Ăn uống"
+            : item.type === "rest"
+              ? "Nghỉ trưa"
+              : "Tham quan",
       })
     if (own.length)
       groups.push({

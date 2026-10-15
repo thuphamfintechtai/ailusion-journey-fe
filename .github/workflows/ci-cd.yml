@@ -14,7 +14,8 @@
 #   secrets  DEPLOY_HOST (ssh.ailusion.io.vn), DEPLOY_USER, DEPLOY_SSH_KEY,
 #            CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET
 #   variable DEPLOY_DIR  (mặc định /home/zuzu/ailusion-journey-fe)
-#   variable NEXT_PUBLIC_APP_URL, NEXT_PUBLIC_API_URL, NEXT_PUBLIC_VIETMAP_KEY (khi build image)
+#   variable NEXT_PUBLIC_APP_URL, NEXT_PUBLIC_API_URL, NEXT_PUBLIC_VIETMAP_KEY,
+#   NEXT_PUBLIC_LANGSMITH_PROJECT_URL, NEXT_PUBLIC_LANGFUSE_PROJECT_URL (khi build image)
 # Branch protection trên main: bắt buộc pull request và status check "Lint + test".
 # Merge PR: Create a merge commit. Không dùng Rebase and merge.
 
@@ -119,6 +120,8 @@ jobs:
             NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL || 'https://journey.ailusion.io.vn' }}
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://journey-api.ailusion.io.vn' }}
             NEXT_PUBLIC_VIETMAP_KEY=${{ vars.NEXT_PUBLIC_VIETMAP_KEY }}
+            NEXT_PUBLIC_LANGSMITH_PROJECT_URL=${{ vars.NEXT_PUBLIC_LANGSMITH_PROJECT_URL }}
+            NEXT_PUBLIC_LANGFUSE_PROJECT_URL=${{ vars.NEXT_PUBLIC_LANGFUSE_PROJECT_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

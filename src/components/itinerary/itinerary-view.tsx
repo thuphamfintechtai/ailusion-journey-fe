@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils"
 
 import { PlanPanel } from "./plan-panel"
 import { forPeople, trieuRange } from "./plan-shared"
+import { TraceIds } from "@/components/trace-ids"
 
 const FIELD_NAMES: Record<string, string> = {
   group_type: "đi cùng ai",
@@ -273,16 +274,19 @@ function Options({
           ))}
         </ul>
       )}
-      <p className="text-[12px] text-trip-ink-3">
-        {result.stats.llm_calls} lượt LLM · {result.stats.tool_calls} lượt gọi
-        tool
-        {result.stats.cost_usd != null
-          ? ` · khoảng ${result.stats.cost_usd.toFixed(3)} USD`
-          : ""}
-        {result.stats.seconds
-          ? ` · ${Math.round(result.stats.seconds)} giây`
-          : ""}
-      </p>
+      <div className="flex items-center gap-1 text-[12px] text-trip-ink-3">
+        <p>
+          {result.stats.llm_calls} lượt LLM · {result.stats.tool_calls} lượt gọi
+          tool
+          {result.stats.cost_usd != null
+            ? ` · khoảng ${result.stats.cost_usd.toFixed(3)} USD`
+            : ""}
+          {result.stats.seconds
+            ? ` · ${Math.round(result.stats.seconds)} giây`
+            : ""}
+        </p>
+        <TraceIds threadId={result.thread_id} runId={result.trace_run_id} />
+      </div>
     </div>
   )
 }

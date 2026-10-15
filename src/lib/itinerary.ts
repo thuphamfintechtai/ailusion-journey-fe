@@ -10,6 +10,8 @@ export type Priority =
   "saving" | "comfort" | "leisure" | "short_time" | "many_places"
 export type SpendStyle = "normal" | "unlimited" | "luxury_within_budget"
 export type BudgetUnit = "group_trip" | "person_trip" | "person_day"
+/** Nghỉ trưa ở đâu (ngày bắt đầu sớm, kéo tới chiều tối). */
+export type Nap = "auto" | "stay" | "cafe" | "hotel" | "none"
 export type TravelMode = "motorbike" | "car" | "bus" | "taxi"
 export type Walking = "M1" | "M2" | "M3" | "M4" | "M5"
 
@@ -68,6 +70,7 @@ export type TripForm = {
   night_return_time?: string | null
   busy_slots?: BusySlot[]
   night_out?: boolean
+  nap?: Nap
   purposes?: Purpose[]
   interests?: string
   walking_level?: Walking | null
@@ -79,7 +82,7 @@ export type TripForm = {
 }
 
 export type ItineraryItem = {
-  type: "start" | "visit" | "meal" | "back"
+  type: "start" | "visit" | "meal" | "rest" | "back"
   start: string
   end: string
   name: string
@@ -252,6 +255,8 @@ export type ItineraryQuestion = {
 
 export type ItineraryResult = {
   thread_id: string
+  /** Run gốc trên LangSmith của lượt này (để mở thẳng trace khi debug). */
+  trace_run_id?: string | null
   status: "ok" | "need_info"
   destination: string
   start_date: string
@@ -380,6 +385,14 @@ export const SPEND_STYLES: { id: SpendStyle; label: string }[] = [
   { id: "normal", label: "Bình thường" },
   { id: "luxury_within_budget", label: "Sang, không vượt ngân sách" },
   { id: "unlimited", label: "Không giới hạn" },
+]
+
+export const NAP_OPTIONS: { id: Nap; label: string }[] = [
+  { id: "auto", label: "Tự chọn" },
+  { id: "stay", label: "Về chỗ ở" },
+  { id: "cafe", label: "Quán cà phê gần đó" },
+  { id: "hotel", label: "Khách sạn gần đó" },
+  { id: "none", label: "Không nghỉ trưa" },
 ]
 
 export const BUDGET_UNITS: { id: BudgetUnit; label: string }[] = [

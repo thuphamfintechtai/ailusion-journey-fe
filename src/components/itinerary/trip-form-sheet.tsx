@@ -26,6 +26,7 @@ import type { TripInfo, TripState } from "@/lib/api"
 import {
   ARRIVAL_BUCKETS,
   BUDGET_UNITS,
+  NAP_OPTIONS,
   GROUP_TYPES,
   MUST_BUCKETS,
   NEEDS,
@@ -93,6 +94,7 @@ function emptyForm(): TripForm {
     required_needs: [],
     busy_slots: [],
     night_out: false,
+    nap: "auto",
     purposes: [],
     interests: "",
     priority: null,
@@ -120,11 +122,21 @@ function toRequest(f: TripForm): TripForm {
     if (Array.isArray(v) && v.length === 0) continue
     if (typeof v === "number" && v === 0 && k !== "group_size") continue
     if (k === "night_out" && v === false) continue
+    if (k === "nap" && v === "auto") continue
     if (k === "spend_style" && v === "normal") continue
     if (k === "budget_unit" && !f.budget) continue
     out[k] = v
   }
   return out as TripForm
+}
+
+/** Ngân sách quy về cả đoàn, cả chuyến (đơn vị trợ lý chat dùng). */
+function groupBudget(f: TripForm): number | null {
+  if (!f.budget) return null
+  const days = daysBetween(f.start_date, f.end_date)
+  if (f.budget_unit === "person_trip") return f.budget * f.group_size
+  if (f.budget_unit === "person_day") return f.budget * f.group_size * days
+  return f.budget
 }
 
 /** Form chat -> TripInfo, để trợ lý chat nhớ đúng bản người dùng đã xác nhận. */
@@ -160,8 +172,8 @@ function toTripInfo(f: TripForm): TripInfo {
     children: (f.kids_under_6 ?? 0) + (f.kids_6_12 ?? 0),
     seniors: f.seniors_65 ?? 0,
     group_type: f.group_type ?? null,
-    budget_million: f.budget
-      ? Math.round((f.budget / 1_000_000) * 10) / 10
+    budget_million: groupBudget(f)
+      ? Math.round((groupBudget(f)! / 1_000_000) * 10) / 10
       : null,
     budget_hard: f.budget ? f.spend_style === "luxury_within_budget" : null,
     access: [
@@ -217,8 +229,13 @@ function fromTripInfo(
     filled += 1
   }
   if (info.budget_million) {
-    next.budget = Math.round(info.budget_million * 1_000_000)
-    next.budget_unit = "group_trip"
+    const total = Math.round(info.budget_million * 1_000_000)
+    // Vẫn là ngân sách user đã chọn theo người / theo ngày: giữ nguyên cách nhập đó.
+    const same = Math.abs((groupBudget(next) ?? 0) - total) < 100_000
+    if (!same) {
+      next.budget = total
+      next.budget_unit = "group_trip"
+    }
     filled += 1
   }
   // p1 "khám phá tiết kiệm" không đổ vào ưu tiên: form không còn lựa chọn "Tiết kiệm" (đã có
@@ -902,7 +919,7 @@ export function TripFormSheet({
 
               <Panel
                 title="Khung giờ"
-                hint="Để trống thì máy tạm đoán (đến 11:00, về 15:00) và ghi rõ trong kết quả."
+                hint="Để trống thì ngày bắt đầu 08:00, ngày cuối về 15:00; giờ về buổi tối sẽ hỏi lại (chưa biết thì 20:00)."
               >
                 <div className="grid gap-3 sm:grid-cols-2">
                   <TimeField
@@ -932,6 +949,19 @@ export function TripFormSheet({
                     onChange={(v) => set("night_return_time", v)}
                   />
                 </div>
+                <Field label="Nghỉ trưa (ngày đi từ sáng sớm tới tối)">
+                  <ChipGrid min={130}>
+                    {NAP_OPTIONS.map((o) => (
+                      <Chip
+                        key={o.id}
+                        on={(form.nap ?? "auto") === o.id}
+                        onClick={() => set("nap", o.id)}
+                      >
+                        {o.label}
+                      </Chip>
+                    ))}
+                  </ChipGrid>
+                </Field>
                 <Field label="Lịch bận">
                   <div className="grid gap-2">
                     {busy.map((b, i) => (

@@ -49,9 +49,15 @@ export const NODES: Record<string, NodeMeta> = {
     marker: "square",
     sources: ["check_opening_hours", "check_place_needs"],
   },
+  chot_nhanh: {
+    label: "Chia chỗ cho 3 phương án",
+    phase: "schedule",
+    marker: "diamond",
+    sources: ["distance_matrix"],
+  },
   xac_minh: {
-    label: "Experience + Budget xác minh",
-    phase: "search",
+    label: "Experience + Budget xác minh chỗ sắp xếp lịch",
+    phase: "schedule",
     marker: "circle",
   },
   cham: {
@@ -64,6 +70,12 @@ export const NODES: Record<string, NodeMeta> = {
     label: "Chia chỗ cho từng ngày",
     phase: "schedule",
     marker: "diamond",
+  },
+  lap_phuong_an: {
+    label: "Lập 3 phương án song song",
+    phase: "schedule",
+    marker: "circle",
+    sources: ["distance_matrix"],
   },
   xep_lich: { label: "Planner xếp lịch", phase: "schedule", marker: "circle" },
   kiem_lich: {
@@ -106,6 +118,10 @@ export const PHASES: Record<Phase, string> = {
 const ROLES: Record<string, { name: string; sources: string[] }> = {
   experience: { name: "Experience", sources: ["get_place_reviews"] },
   budget: { name: "Budget", sources: ["web_search", "fetch_page"] },
+  // Ba nhánh của "lap_phuong_an": mỗi nhánh chia ngày, Planner xếp lịch, chạy thử, xếp hạng.
+  pa1: { name: "Phương án 1", sources: ["distance_matrix"] },
+  pa2: { name: "Phương án 2", sources: ["distance_matrix"] },
+  pa3: { name: "Phương án 3", sources: ["distance_matrix"] },
 }
 
 const LLM = "LLM"
