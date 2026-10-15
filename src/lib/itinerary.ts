@@ -12,6 +12,29 @@ export type BudgetUnit = "group_trip" | "person_trip" | "person_day"
 export type TravelMode = "motorbike" | "car" | "bus" | "taxi"
 export type Walking = "M1" | "M2" | "M3" | "M4" | "M5"
 
+/** Giờ muốn tới chỗ user chọn: "HH:MM" hoặc một buổi. */
+export type MustTime = "morning" | "afternoon" | "evening" | (string & {})
+
+/** Địa điểm user chỉ định: lộ trình phải có, đúng ngày / giờ nếu có. */
+export type MustVisit = {
+  name: string
+  day: number | null
+  time: MustTime | null
+}
+
+export const MUST_BUCKETS: { id: MustTime; label: string }[] = [
+  { id: "morning", label: "Buổi sáng" },
+  { id: "afternoon", label: "Buổi chiều" },
+  { id: "evening", label: "Buổi tối" },
+]
+
+/** "lúc 19:00" | "buổi tối" */
+export function mustTimeText(time: MustTime | null | undefined): string | null {
+  if (!time) return null
+  const bucket = MUST_BUCKETS.find((b) => b.id === time)
+  return bucket ? bucket.label.toLowerCase() : `lúc ${time}`
+}
+
 export type BusySlot = {
   day: number
   busy_start: string
@@ -47,6 +70,7 @@ export type TripForm = {
   purposes?: Purpose[]
   interests?: string
   walking_level?: Walking | null
+  must_visits?: MustVisit[]
   priority?: Priority | null
   spend_style?: SpendStyle
 }
@@ -75,6 +99,9 @@ export type ItineraryItem = {
   summary?: string | null
   /** Tối đa 3 lý do chọn điểm này. */
   why?: string[]
+  /** User tự chọn chỗ này trong form ("Địa điểm muốn đi"). */
+  must?: boolean
+  must_time?: MustTime | null
   /** Chặng từ điểm trước tới điểm này: phương tiện, quãng đường, tiền (VND, cả đoàn). */
   travel_mode?: TravelMode | null
   travel_km?: number | null
@@ -156,6 +183,9 @@ export type ItineraryDay = {
   items: ItineraryItem[]
   weather: string | null
   maps_url: string | null
+  /** Đường xe chạy thật cả ngày (polyline mã hoá kiểu Google, nối tiếp nhau); trống = nối thẳng. */
+  route_paths?: string[]
+  route_precision?: number
   /** Một dòng về phạm vi địa lý của ngày. */
   area_note?: string | null
   /** Ngày âm lịch, VD "10/9". */
@@ -327,7 +357,8 @@ export const GROUP_TYPES: { id: GroupType; label: string }[] = [
 ]
 
 export const PRIORITIES: { id: Priority; label: string; note: string }[] = [
-  { id: "saving", label: "Tiết kiệm", note: "Tiền thấp trước" },
+  // Không có "Tiết kiệm": đã có ô ngân sách, muốn tiết kiệm thì giảm ngân sách (lộ trình bám
+  // ngân sách ±5%).
   { id: "comfort", label: "Đỡ mệt", note: "Ít ngồi xe, ít chỗ" },
   { id: "leisure", label: "Thong thả", note: "Ít chỗ, đúng ý, chất lượng" },
   {

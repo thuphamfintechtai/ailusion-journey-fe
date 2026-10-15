@@ -100,7 +100,7 @@ export function PackingTab({
                   const on = checked.has(k)
                   return (
                     <li key={k}>
-                      <label className="flex cursor-pointer items-start gap-2.5 py-2">
+                      <label className="relative flex cursor-pointer items-start gap-2.5 py-2">
                         <input
                           type="checkbox"
                           checked={on}

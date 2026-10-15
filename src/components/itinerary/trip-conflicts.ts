@@ -290,6 +290,54 @@ function formConflicts(f: TripForm): Conflict[] {
       })
     }
   }
+  // Địa điểm muốn đi: ngày vượt số ngày chuyến, trùng tên.
+  const days = daysOf(f)
+  const musts = f.must_visits ?? []
+  musts.forEach((m, i) => {
+    const name = m.name.trim()
+    if (name && m.day && m.day > days) {
+      out.push({
+        id: `must-day:${i}:${m.day}:${days}`,
+        text: `“${name}” chọn ngày ${m.day} nhưng chuyến chỉ có ${days} ngày.`,
+        options: [
+          {
+            label: "Ngày bất kỳ",
+            apply: (x) => ({
+              ...x,
+              must_visits: (x.must_visits ?? []).map((v, j) =>
+                j === i ? { ...v, day: null } : v
+              ),
+            }),
+          },
+          {
+            label: `Đổi sang ngày ${days}`,
+            apply: (x) => ({
+              ...x,
+              must_visits: (x.must_visits ?? []).map((v, j) =>
+                j === i ? { ...v, day: days } : v
+              ),
+            }),
+          },
+        ],
+      })
+    }
+    const first = musts.findIndex((v) => plain(v.name) === plain(name))
+    if (name && first !== i) {
+      out.push({
+        id: `must-twice:${i}:${plain(name)}`,
+        text: `“${name}” có 2 lần trong danh sách địa điểm muốn đi.`,
+        options: [
+          {
+            label: "Bỏ dòng trùng",
+            apply: (x) => ({
+              ...x,
+              must_visits: (x.must_visits ?? []).filter((_, j) => j !== i),
+            }),
+          },
+        ],
+      })
+    }
+  })
   return out
 }
 
