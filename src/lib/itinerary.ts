@@ -107,6 +107,8 @@ export type ItineraryItem = {
   why?: string[]
   /** User tự chọn chỗ này trong form ("Địa điểm muốn đi"). */
   must?: boolean
+  /** Thứ user nhắc mà chỗ này đáp ứng (VD "bún bò"): hiện nhãn "Theo yêu cầu". */
+  wanted?: string | null
   must_time?: MustTime | null
   /** Chặng từ điểm trước tới điểm này: phương tiện, quãng đường, tiền (VND, cả đoàn). */
   travel_mode?: TravelMode | null
