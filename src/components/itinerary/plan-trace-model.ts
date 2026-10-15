@@ -65,6 +65,12 @@ export const NODES: Record<string, NodeMeta> = {
     phase: "schedule",
     marker: "diamond",
   },
+  lap_phuong_an: {
+    label: "Lập 3 phương án song song",
+    phase: "schedule",
+    marker: "circle",
+    sources: ["distance_matrix"],
+  },
   xep_lich: { label: "Planner xếp lịch", phase: "schedule", marker: "circle" },
   kiem_lich: {
     label: "Chạy thử lịch, đặt giờ ăn",
@@ -106,6 +112,10 @@ export const PHASES: Record<Phase, string> = {
 const ROLES: Record<string, { name: string; sources: string[] }> = {
   experience: { name: "Experience", sources: ["get_place_reviews"] },
   budget: { name: "Budget", sources: ["web_search", "fetch_page"] },
+  // Ba nhánh của "lap_phuong_an": mỗi nhánh chia ngày, Planner xếp lịch, chạy thử, xếp hạng.
+  pa1: { name: "Phương án 1", sources: ["distance_matrix"] },
+  pa2: { name: "Phương án 2", sources: ["distance_matrix"] },
+  pa3: { name: "Phương án 3", sources: ["distance_matrix"] },
 }
 
 const LLM = "LLM"

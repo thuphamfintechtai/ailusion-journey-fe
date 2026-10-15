@@ -153,9 +153,14 @@ function stopsOf(days: MapDay[], stay: ItineraryResult["stay"]): Stops {
     let n = 0
     for (const item of day.items) {
       let stop: Stop | null = null
-      if (item.type === "visit" || item.type === "meal") {
+      if (
+        item.type === "visit" ||
+        item.type === "meal" ||
+        (item.type === "rest" && item.lat !== null && item.lng !== null)
+      ) {
         if (item.lat === null || item.lng === null) continue
         const isPoi = item.type === "visit"
+        // Quán cà phê / khách sạn nghỉ trưa vẽ như quán ăn (ghim không số).
         if (isPoi) n += 1
         stop = {
           lat: item.lat,
@@ -168,7 +173,11 @@ function stopsOf(days: MapDay[], stay: ItineraryResult["stay"]): Stops {
           item,
         }
         markers.push(stop)
-      } else if (item.type === "back" && homeStop && points.length > 1) {
+      } else if (
+        (item.type === "back" || item.type === "rest") &&
+        homeStop &&
+        points.length > 1
+      ) {
         stop = homeStop
       }
       if (!stop) continue
