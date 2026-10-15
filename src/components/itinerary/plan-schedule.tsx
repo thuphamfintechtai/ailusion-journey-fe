@@ -13,7 +13,11 @@ import {
   Utensils,
 } from "lucide-react"
 
-import type { ItineraryDay, ItineraryItem } from "@/lib/itinerary"
+import {
+  mustTimeText,
+  type ItineraryDay,
+  type ItineraryItem,
+} from "@/lib/itinerary"
 import { cn } from "@/lib/utils"
 
 import { PlaceSheet } from "./plan-place"
@@ -192,6 +196,12 @@ function PlaceCard({
       <span className="grid min-w-0 flex-1 content-start gap-0.5">
         <span className="flex flex-wrap items-baseline gap-x-1.5 text-[15px] leading-snug font-semibold">
           <span className="min-w-0">{item.name}</span>
+          {item.must && (
+            <span className="self-center rounded-full bg-trip-lotus-bg px-2 py-px text-[11.5px] font-bold text-trip-lotus">
+              Bạn chọn
+              {item.must_time ? ` · ${mustTimeText(item.must_time)}` : ""}
+            </span>
+          )}
           {item.end !== item.start && (
             <span className="font-num text-[13px] font-normal text-trip-ink-3">
               → {item.end}

@@ -27,6 +27,7 @@ import {
   ARRIVAL_BUCKETS,
   BUDGET_UNITS,
   GROUP_TYPES,
+  MUST_BUCKETS,
   NEEDS,
   PRIORITIES,
   PURPOSES,
@@ -34,6 +35,7 @@ import {
   TRAVEL_MODES,
   WALKING,
   type BusySlot,
+  type MustVisit,
   type Purpose,
   type TripForm,
 } from "@/lib/itinerary"
@@ -101,6 +103,7 @@ function emptyForm(): TripForm {
     night_return_time: null,
     wake_time: null,
     walking_level: null,
+    must_visits: [],
     stay_booked: null,
   }
 }
@@ -108,7 +111,10 @@ function emptyForm(): TripForm {
 /** Bỏ ô trống trước khi gửi: LLM service coi ô có trong body là "user đã điền". */
 function toRequest(f: TripForm): TripForm {
   const out: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(f)) {
+  const musts = (f.must_visits ?? [])
+    .map((m) => ({ ...m, name: m.name.trim() }))
+    .filter((m) => m.name)
+  for (const [k, v] of Object.entries({ ...f, must_visits: musts })) {
     if (v === null || v === undefined || v === "") continue
     if (Array.isArray(v) && v.length === 0) continue
     if (typeof v === "number" && v === 0 && k !== "group_size") continue
@@ -165,6 +171,9 @@ function toTripInfo(f: TripForm): TripInfo {
       .filter(Boolean),
     transport: null,
     pace: null,
+    must_visits: (f.must_visits ?? [])
+      .map((m) => ({ ...m, name: m.name.trim() }))
+      .filter((m) => m.name),
   }
 }
 
@@ -210,9 +219,10 @@ function fromTripInfo(
     next.budget_unit = "group_trip"
     filled += 1
   }
-  if (info.persona) {
+  // p1 "khám phá tiết kiệm" không đổ vào ưu tiên: form không còn lựa chọn "Tiết kiệm" (đã có
+  // ngân sách).
+  if (info.persona && info.persona !== "p1") {
     const priority = {
-      p1: "saving",
       p2: "comfort",
       p3: "leisure",
       p4: "short_time",
@@ -262,6 +272,14 @@ function fromTripInfo(
   } as const
   if (info.transport)
     next.travel_mode = mode[info.transport as keyof typeof mode] ?? null
+  if (info.must_visits?.length) {
+    next.must_visits = info.must_visits.map((m) => ({
+      name: m.name,
+      day: m.day ?? null,
+      time: m.time ?? null,
+    }))
+    filled += 1
+  }
   return { form: next, filled }
 }
 
@@ -546,6 +564,13 @@ export function TripFormSheet({
   }
 
   const busy = form.busy_slots ?? []
+  const musts = form.must_visits ?? []
+  const setMust = (i: number, patch: Partial<MustVisit>) =>
+    set(
+      "must_visits",
+      musts.map((m, j) => (j === i ? { ...m, ...patch } : m))
+    )
+
   const setBusy = (i: number, patch: Partial<BusySlot>) =>
     set(
       "busy_slots",
@@ -727,6 +752,42 @@ export function TripFormSheet({
                       ))}
                     </ChipGrid>
                   </Field>
+                </div>
+              </Panel>
+
+              <Panel
+                title="Địa điểm muốn đi"
+                hint="Chỗ bạn nhất định muốn ghé. Chọn ngày, giờ nếu đã có hẹn; để “bất kỳ” thì máy tự xếp cho hợp đường."
+              >
+                <div className="grid gap-2">
+                  {musts.map((m, i) => (
+                    <MustRow
+                      key={i}
+                      value={m}
+                      days={Math.max(1, days)}
+                      onChange={(patch) => setMust(i, patch)}
+                      onRemove={() =>
+                        set(
+                          "must_visits",
+                          musts.filter((_, j) => j !== i)
+                        )
+                      }
+                    />
+                  ))}
+                  {musts.length < 10 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        set("must_visits", [
+                          ...musts,
+                          { name: "", day: null, time: null },
+                        ])
+                      }
+                      className="justify-self-start rounded-[10px] border border-dashed border-trip-line-2 px-3 py-2 text-[13.5px] font-semibold text-trip-ink-2 hover:border-trip-ink-3"
+                    >
+                      + Thêm địa điểm
+                    </button>
+                  )}
                 </div>
               </Panel>
 
@@ -1088,6 +1149,84 @@ export function TripFormSheet({
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  )
+}
+
+/** Một dòng "Địa điểm muốn đi": tên, ngày (hoặc bất kỳ), giờ (bất kỳ / buổi / giờ cụ thể). */
+function MustRow({
+  value,
+  days,
+  onChange,
+  onRemove,
+}: {
+  value: MustVisit
+  days: number
+  onChange: (patch: Partial<MustVisit>) => void
+  onRemove: () => void
+}) {
+  const bucket = MUST_BUCKETS.some((b) => b.id === value.time)
+  const timeMode = !value.time ? "" : bucket ? value.time : "clock"
+  return (
+    <div className="grid gap-2 rounded-xl border border-trip-line bg-trip-paper p-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+      <input
+        aria-label="Tên địa điểm"
+        value={value.name}
+        onChange={(e) => onChange({ name: e.target.value })}
+        placeholder="Ví dụ: Bà Nà Hills, Bếp Hên"
+        className={INPUT}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          aria-label="Ngày"
+          value={value.day ?? ""}
+          onChange={(e) =>
+            onChange({ day: e.target.value ? Number(e.target.value) : null })
+          }
+          className={cn(INPUT, "w-[130px]")}
+        >
+          <option value="">Ngày bất kỳ</option>
+          {Array.from({ length: days }, (_, d) => (
+            <option key={d} value={d + 1}>
+              Ngày {d + 1}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Giờ"
+          value={timeMode}
+          onChange={(e) => {
+            const v = e.target.value
+            onChange({ time: v === "clock" ? "19:00" : v || null })
+          }}
+          className={cn(INPUT, "w-[130px]")}
+        >
+          <option value="">Giờ bất kỳ</option>
+          {MUST_BUCKETS.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.label}
+            </option>
+          ))}
+          <option value="clock">Giờ cụ thể</option>
+        </select>
+        {timeMode === "clock" && (
+          <input
+            aria-label="Tới lúc"
+            type="time"
+            value={value.time ?? ""}
+            onChange={(e) => onChange({ time: e.target.value || null })}
+            className={cn(INPUT, "w-[120px]")}
+          />
+        )}
+        <button
+          type="button"
+          aria-label="Xoá địa điểm"
+          onClick={onRemove}
+          className="ml-auto grid size-9 place-items-center rounded-lg text-trip-ink-3 hover:text-trip-seal"
+        >
+          <Trash2 className="size-4" />
+        </button>
+      </div>
+    </div>
   )
 }
 

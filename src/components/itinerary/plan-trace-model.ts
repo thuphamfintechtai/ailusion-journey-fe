@@ -23,7 +23,7 @@ export const NODES: Record<string, NodeMeta> = {
     label: "Phân nhóm khách, tính giờ rảnh",
     phase: "intake",
     marker: "diamond",
-    sources: ["geocode_vn", "find_stays", "browse_places"],
+    sources: ["geocode_vn", "find_stays", "find_places"],
   },
   hoi_lai: {
     label: "Hỏi lại thông tin còn thiếu",
@@ -36,7 +36,7 @@ export const NODES: Record<string, NodeMeta> = {
     phase: "search",
     marker: "square",
     sources: [
-      "browse_places",
+      "find_places",
       "find_stays",
       "weather_forecast",
       "find_festivals",
@@ -111,11 +111,13 @@ const ROLES: Record<string, { name: string; sources: string[] }> = {
 const LLM = "LLM"
 
 const TOOL_LABELS: Record<string, string> = {
+  find_places: "Google Maps",
+  // Tên cũ (trước khi MCP gộp vào find_places): giữ để lộ trình đã lưu vẫn hiện đúng nhãn.
   browse_places: "Google Maps",
   find_places_by_needs: "Google Maps",
   search_places: "Google Maps",
   get_place_details: "Google Maps",
-  find_nearby: "Google Maps",
+  find_nearby: "Vietmap",
   get_place_reviews: "Đánh giá",
   get_place_photos: "Ảnh",
   distance_matrix: "Khoảng cách & thời gian",

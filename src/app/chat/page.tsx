@@ -465,7 +465,7 @@ export default function ChatPage() {
       : null
 
   return (
-    <div className="flex h-dvh shrink-0 overflow-hidden bg-background">
+    <div className="flex h-dvh shrink-0 overflow-clip bg-background">
       {/* Mobile: danh sách chuyến đi trượt ra từ trái. */}
       {sidebarOpen && (
         <div

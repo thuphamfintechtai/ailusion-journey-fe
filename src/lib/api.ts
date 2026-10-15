@@ -5,7 +5,7 @@
  * localStorage (xem `auth.tsx`) và gắn vào header Authorization ở đây.
  */
 
-import type { ItineraryResult, TripForm } from "@/lib/itinerary"
+import type { ItineraryResult, MustVisit, TripForm } from "@/lib/itinerary"
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 const API = `${BASE_URL}/api/v1`
@@ -61,6 +61,8 @@ export type TripInfo = {
   interests: string[]
   transport: string | null
   pace: string | null
+  /** Địa điểm cụ thể đã nói muốn đi (đổ vào "Địa điểm muốn đi" của form). */
+  must_visits?: MustVisit[]
 }
 /**
  * Form chuyến đi của một hội thoại, trợ lý tự điền dần khi người dùng kể. `missing` là các

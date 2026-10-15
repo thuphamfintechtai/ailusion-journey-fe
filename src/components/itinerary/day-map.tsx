@@ -66,11 +66,52 @@ type Stop = {
 }
 /** Một chặng: nhãn phương tiện + số phút đặt ở giữa đoạn. */
 type Leg = { from: Stop; to: Stop; min: number; mode: AltMode | null }
-type Route = { color: string; points: Stop[]; legs: Leg[] }
+/** `path`: đường xe chạy thật [lng, lat]; không có thì nối thẳng các điểm (nét đứt). */
+type Route = {
+  color: string
+  points: Stop[]
+  legs: Leg[]
+  path: [number, number][] | null
+}
 type Stops = { markers: Stop[]; routes: Route[] }
 
 /** Ngày cần vẽ, kèm biến màu CSS riêng của ngày (VD "--trip-sky"). */
 export type MapDay = { day: ItineraryDay; color: string }
+
+/** Giải mã polyline kiểu Google (Vietmap trả) ra các điểm [lng, lat]. */
+function decodePolyline(text: string, precision = 5): [number, number][] {
+  const factor = 10 ** precision
+  const out: [number, number][] = []
+  let i = 0
+  let lat = 0
+  let lng = 0
+  const next = () => {
+    let result = 0
+    let shift = 0
+    let byte: number
+    do {
+      byte = text.charCodeAt(i++) - 63
+      result |= (byte & 0x1f) << shift
+      shift += 5
+    } while (byte >= 0x20 && i < text.length)
+    return result & 1 ? ~(result >> 1) : result >> 1
+  }
+  while (i < text.length) {
+    lat += next()
+    lng += next()
+    out.push([lng / factor, lat / factor])
+  }
+  return out
+}
+
+/** Đường cả ngày: nối các đoạn polyline; đoạn sau bắt đầu ở điểm cuối đoạn trước nên bỏ trùng. */
+function pathOf(day: ItineraryDay): [number, number][] | null {
+  const parts = (day.route_paths ?? []).map((p) =>
+    decodePolyline(p, day.route_precision ?? 5)
+  )
+  const path = parts.flatMap((p, i) => (i ? p.slice(1) : p))
+  return path.length > 1 ? path : null
+}
 
 function css(name: string): string {
   return getComputedStyle(document.documentElement)
@@ -144,7 +185,7 @@ function stopsOf(days: MapDay[], stay: ItineraryResult["stay"]): Stops {
     // Không có mục "back": vẫn khép tuyến về chỗ ở.
     if (homeStop && points.length > 1 && points.at(-1) !== homeStop)
       points.push(homeStop)
-    routes.push({ color, points, legs })
+    routes.push({ color, points, legs, path: pathOf(day) })
   }
   return { markers, routes }
 }
@@ -179,6 +220,41 @@ function midpoint(leg: Leg): { lat: number; lng: number } {
     lat: (leg.from.lat + leg.to.lat) / 2,
     lng: (leg.from.lng + leg.to.lng) / 2,
   }
+}
+
+/** Điểm trên đường thật gần một toạ độ nhất, tìm từ `from` trở đi (đường đi theo thứ tự chặng). */
+function nearestIndex(
+  path: [number, number][],
+  at: { lat: number; lng: number },
+  from: number
+): number {
+  let best = from
+  let bestD = Infinity
+  for (let i = from; i < path.length; i++) {
+    const d = (path[i][0] - at.lng) ** 2 + (path[i][1] - at.lat) ** 2
+    if (d < bestD) {
+      bestD = d
+      best = i
+    }
+  }
+  return best
+}
+
+/**
+ * Chỗ đặt nhãn "x phút" của từng chặng: có đường thật thì lấy điểm giữa của đoạn đường giữa 2
+ * điểm (nằm trên phố), không thì điểm giữa đường thẳng.
+ */
+function legSpots(route: Route): { lat: number; lng: number }[] {
+  const path = route.path
+  if (!path) return route.legs.map(midpoint)
+  let cursor = 0
+  return route.legs.map((leg) => {
+    const a = nearestIndex(path, leg.from, cursor)
+    const b = nearestIndex(path, leg.to, a)
+    cursor = b
+    const [lng, lat] = path[Math.floor((a + b) / 2)]
+    return { lat, lng }
+  })
 }
 
 // Icon giường (chỗ ở) và dao nĩa (quán ăn), cùng hình với bộ lucide của web.
@@ -281,11 +357,14 @@ function drawMapLibre(container: HTMLElement, { markers, routes }: Stops) {
     "top-left"
   )
   map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left")
-  for (const r of routes)
-    for (const leg of r.legs)
+  for (const r of routes) {
+    const spots = legSpots(r)
+    r.legs.forEach((leg, i) =>
       new maplibregl.Marker({ element: legElement(leg) })
-        .setLngLat(midpoint(leg))
+        .setLngLat(spots[i])
         .addTo(map)
+    )
+  }
   for (const s of markers)
     new maplibregl.Marker({ element: pinElement(s) })
       .setLngLat([s.lng, s.lat])
@@ -308,7 +387,8 @@ function drawMapLibre(container: HTMLElement, { markers, routes }: Stops) {
   }
   map.on("load", () => {
     routes.forEach((r, i) => {
-      const line = r.points.map((s): [number, number] => [s.lng, s.lat])
+      const line =
+        r.path ?? r.points.map((s): [number, number] => [s.lng, s.lat])
       if (line.length < 2) return
       const id = `route-${i}`
       map.addSource(id, {
@@ -319,8 +399,8 @@ function drawMapLibre(container: HTMLElement, { markers, routes }: Stops) {
           geometry: { type: "LineString", coordinates: line },
         },
       })
-      // Viền trắng bên dưới cho đường nổi trên nền; nét đứt vì đây là thứ tự đi, không phải
-      // đường xe chạy thật.
+      // Viền trắng bên dưới cho đường nổi trên nền. Có đường xe chạy thật thì nét liền; chưa có
+      // thì nét đứt vì chỉ là thứ tự đi, không phải đường thật.
       map.addLayer({
         id: `${id}-casing`,
         type: "line",
@@ -339,8 +419,8 @@ function drawMapLibre(container: HTMLElement, { markers, routes }: Stops) {
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
           "line-color": css(r.color) || css("--trip-fill"),
-          "line-width": 3,
-          "line-dasharray": [2, 2],
+          "line-width": r.path ? 4 : 3,
+          ...(r.path ? {} : { "line-dasharray": [2, 2] }),
         },
       })
     })
@@ -355,17 +435,20 @@ function drawLeaflet(container: HTMLElement, { markers, routes }: Stops) {
   )
   L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map)
   for (const r of routes) {
-    const line = r.points.map((s): L.LatLngTuple => [s.lat, s.lng])
+    const line = r.path
+      ? r.path.map(([lng, lat]): L.LatLngTuple => [lat, lng])
+      : r.points.map((s): L.LatLngTuple => [s.lat, s.lng])
     if (line.length < 2) continue
     L.polyline(line, { color: "#ffffff", weight: 6, opacity: 0.9 }).addTo(map)
     L.polyline(line, {
       color: css(r.color) || css("--trip-fill"),
-      weight: 3,
-      dashArray: "6 7",
+      weight: r.path ? 4 : 3,
+      dashArray: r.path ? undefined : "6 7",
       lineCap: "round",
     }).addTo(map)
-    for (const leg of r.legs) {
-      const m = midpoint(leg)
+    const spots = legSpots(r)
+    for (const [i, leg] of r.legs.entries()) {
+      const m = spots[i]
       L.marker([m.lat, m.lng], {
         interactive: false,
         icon: L.divIcon({
