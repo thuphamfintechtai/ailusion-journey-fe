@@ -216,6 +216,11 @@ function PlaceCard({
               {item.must_time ? ` · ${mustTimeText(item.must_time)}` : ""}
             </span>
           )}
+          {item.wanted && !item.must && (
+            <span className="self-center rounded-full bg-trip-jade-bg px-2 py-px text-[11.5px] font-bold text-trip-jade">
+              Theo yêu cầu: {item.wanted}
+            </span>
+          )}
           {item.end !== item.start && (
             <span className="font-num text-[13px] font-normal text-trip-ink-3">
               → {item.end}
