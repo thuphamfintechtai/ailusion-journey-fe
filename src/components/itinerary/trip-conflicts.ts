@@ -290,6 +290,22 @@ function formConflicts(f: TripForm): Conflict[] {
       })
     }
   }
+  // Nhiều điểm đến trong 1 ô (VD "Huế, Đà Nẵng"): hiện chỉ lập lộ trình cho 1 nơi, hỏi giữ nơi nào.
+  const places = f.destination
+    .split(/\s*(?:,|;|\+|&|\s-\s|\s–\s|\svà\s)\s*/i)
+    .map((x) => x.trim())
+    .filter(Boolean)
+  if (places.length > 1) {
+    out.push({
+      id: `multi-dest:${plain(f.destination)}`,
+      text: `Hiện chỉ lập lộ trình cho 1 điểm đến mỗi chuyến (chưa hỗ trợ ${places.join(" + ")}). Giữ nơi nào?`,
+      options: places.map((pl) => ({
+        label: pl,
+        apply: (x: TripForm) => ({ ...x, destination: pl }),
+      })),
+    })
+  }
+
   // Địa điểm muốn đi: ngày vượt số ngày chuyến, trùng tên.
   const days = daysOf(f)
   const musts = f.must_visits ?? []

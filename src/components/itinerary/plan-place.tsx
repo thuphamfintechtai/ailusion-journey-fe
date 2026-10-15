@@ -379,7 +379,8 @@ function Hero({
     ) : null
 
   return (
-    <div className="relative">
+    // isolate + overflow-hidden: ảnh không bao giờ vẽ đè lên tên chỗ, thanh tab bên dưới.
+    <div className="relative isolate overflow-hidden">
       {/* Điện thoại */}
       {images.length > 1 ? (
         <div className="flex h-72 snap-x snap-mandatory [scrollbar-width:none] gap-1.5 overflow-x-auto sm:hidden">
@@ -400,7 +401,7 @@ function Hero({
 
       {/* Máy tính */}
       {mosaic ? (
-        <div className="hidden h-[min(400px,46dvh)] grid-cols-[2fr_1fr] gap-1.5 sm:grid">
+        <div className="hidden h-[min(400px,46dvh)] grid-cols-[2fr_1fr] grid-rows-[minmax(0,1fr)] gap-1.5 sm:grid">
           <Tile
             src={images[0]}
             label="Xem ảnh 1"
@@ -409,7 +410,7 @@ function Hero({
           />
           <div
             className={cn(
-              "grid gap-1.5",
+              "grid min-h-0 grid-rows-[minmax(0,1fr)] gap-1.5",
               (smalls.length >= 3 || (loading && !smalls.length)) &&
                 "grid-cols-2 grid-rows-2",
               smalls.length === 2 && "grid-rows-2"
@@ -495,7 +496,7 @@ function Tile({
       onClick={onClick}
       aria-label={label}
       className={cn(
-        "group relative block overflow-hidden bg-trip-sheet-2 outline-none focus-visible:ring-[3px] focus-visible:ring-trip-sky/40 focus-visible:ring-inset",
+        "group relative block min-h-0 overflow-hidden bg-trip-sheet-2 outline-none focus-visible:ring-[3px] focus-visible:ring-trip-sky/40 focus-visible:ring-inset",
         className
       )}
     >

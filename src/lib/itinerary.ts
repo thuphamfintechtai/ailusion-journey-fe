@@ -6,7 +6,8 @@
 export type Purpose =
   "relax" | "food" | "culture" | "fun" | "adventure" | "shopping"
 export type GroupType = "solo" | "couple" | "friends" | "colleagues" | "family"
-export type Priority = "saving" | "comfort" | "leisure" | "short_time"
+export type Priority =
+  "saving" | "comfort" | "leisure" | "short_time" | "many_places"
 export type SpendStyle = "normal" | "unlimited" | "luxury_within_budget"
 export type BudgetUnit = "group_trip" | "person_trip" | "person_day"
 export type TravelMode = "motorbike" | "car" | "bus" | "taxi"
@@ -71,6 +72,8 @@ export type TripForm = {
   interests?: string
   walking_level?: Walking | null
   must_visits?: MustVisit[]
+  /** Nhu cầu bắt buộc gõ tự do (VD "không ăn cay"); máy đổi ra mã lọc được, phần còn lại làm lưu ý. */
+  needs_note?: string
   priority?: Priority | null
   spend_style?: SpendStyle
 }
@@ -365,6 +368,11 @@ export const PRIORITIES: { id: Priority; label: string; note: string }[] = [
     id: "short_time",
     label: "Ít thời gian",
     note: "Chỗ nổi tiếng, ít ngồi xe",
+  },
+  {
+    id: "many_places",
+    label: "Đi nhiều chỗ",
+    note: "Nhiều điểm nhất, ít ngồi xe",
   },
 ]
 

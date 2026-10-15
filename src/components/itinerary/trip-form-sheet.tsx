@@ -104,6 +104,7 @@ function emptyForm(): TripForm {
     wake_time: null,
     walking_level: null,
     must_visits: [],
+    needs_note: "",
     stay_booked: null,
   }
 }
@@ -141,6 +142,7 @@ function toTripInfo(f: TripForm): TripInfo {
     comfort: "p2",
     leisure: "p3",
     short_time: "p4",
+    many_places: null,
   } as const
   const adults = Math.max(
     0,
@@ -506,9 +508,14 @@ export function TripFormSheet({
     setForm((f) => ({ ...f, [key]: value }))
 
   const days = daysBetween(form.start_date, form.end_date)
+  // Bắt buộc trước khi lập lộ trình: đi đâu, ngày đi / về, mấy người, ngân sách bao nhiêu.
+  const pastStart = form.start_date < isoDate(new Date())
   const missing = [
     !form.destination.trim() && "điểm đến",
+    pastStart && "ngày đi (không được trước hôm nay)",
     (days < 1 || days > MAX_DAYS) && `ngày về (tối đa ${MAX_DAYS} ngày)`,
+    form.group_size < 1 && "số người",
+    !(form.budget && form.budget > 0) && "ngân sách",
   ].filter((x): x is string => Boolean(x))
   const conflicts = conflictsOf(form, chatInfo).filter(
     (c) => !kept.includes(c.id)
@@ -518,6 +525,8 @@ export function TripFormSheet({
     if (o.apply) setForm(o.apply)
     else setKept((k) => [...k, c.id])
   }
+  // Ô gõ ngân sách tuỳ ý (triệu): giữ chữ user gõ ("6,5"); bấm mức có sẵn thì ô trống lại.
+  const [budgetText, setBudgetText] = React.useState("")
   const budgetMillion = form.budget
     ? Math.round(form.budget / 100_000) / 10
     : null
@@ -642,10 +651,11 @@ export function TripFormSheet({
                   ))}
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <Field label="Ngày đi" htmlFor="tf-start">
+                  <Field label="Ngày đi" htmlFor="tf-start" missing={pastStart}>
                     <input
                       id="tf-start"
                       type="date"
+                      min={isoDate(new Date())}
                       value={form.start_date}
                       onChange={(e) => {
                         const start = e.target.value
@@ -691,23 +701,41 @@ export function TripFormSheet({
                     onChange={(v) => set("group_size", v)}
                   />
                 </div>
-                <Field label="Ngân sách (triệu đồng)">
+                <Field
+                  label="Ngân sách (triệu đồng)"
+                  htmlFor="tf-budget"
+                  missing={!(form.budget && form.budget > 0)}
+                >
                   <ChipGrid min={52}>
                     {budgets.map((b) => (
                       <Chip
                         key={b}
                         on={budgetMillion === b}
-                        onClick={() =>
+                        onClick={() => {
+                          setBudgetText("")
                           set(
                             "budget",
                             budgetMillion === b ? null : b * 1_000_000
                           )
-                        }
+                        }}
                       >
                         <span className="font-num font-semibold">{b}</span>
                       </Chip>
                     ))}
                   </ChipGrid>
+                  <input
+                    id="tf-budget"
+                    inputMode="decimal"
+                    value={budgetText}
+                    onChange={(e) => {
+                      const text = e.target.value.replace(/[^\d.,]/g, "")
+                      setBudgetText(text)
+                      const v = Number(text.replace(",", "."))
+                      set("budget", v > 0 ? Math.round(v * 1_000_000) : null)
+                    }}
+                    placeholder="Số khác, VD 6,5"
+                    className={cn(INPUT, "max-w-[180px]")}
+                  />
                 </Field>
                 {form.budget ? (
                   <ChipGrid min={160}>
@@ -862,6 +890,13 @@ export function TripFormSheet({
                       </Chip>
                     ))}
                   </div>
+                  <input
+                    aria-label="Nhu cầu khác"
+                    value={form.needs_note ?? ""}
+                    onChange={(e) => set("needs_note", e.target.value)}
+                    placeholder="Nhu cầu khác, VD: không ăn cay, ông đi lại khó, cần chỗ đỗ ô tô"
+                    className={INPUT}
+                  />
                 </Field>
               </Panel>
 
