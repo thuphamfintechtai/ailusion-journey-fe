@@ -86,6 +86,12 @@ export function ScheduleTab({
           </a>
         )}
       </div>
+      {(day.meal_notes ?? []).length > 0 && (
+        <p className="flex gap-2 text-[13px] text-trip-ink-2">
+          <Utensils className="mt-0.5 size-4 shrink-0 text-trip-ink-3" />
+          <span>{(day.meal_notes ?? []).join(" · ")}</span>
+        </p>
+      )}
       {day.area_note && (
         <p className="flex gap-2 text-[13px] text-trip-ink-2">
           <Route className="mt-0.5 size-4 shrink-0 text-trip-ink-3" />
