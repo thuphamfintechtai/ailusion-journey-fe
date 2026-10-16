@@ -167,11 +167,13 @@ function toRequest(f: TripForm): TripForm {
 
 /** Ngân sách quy về cả đoàn, cả chuyến (đơn vị trợ lý chat dùng). */
 function groupBudget(f: TripForm): number | null {
-  if (!f.budget) return null
+  // Chọn khoảng "trên 10 triệu" ở câu hỏi lại: chỉ có mức dưới.
+  const budget = f.budget || f.budget_min
+  if (!budget) return null
   const days = daysBetween(f.start_date, f.end_date)
-  if (f.budget_unit === "person_trip") return f.budget * f.group_size
-  if (f.budget_unit === "person_day") return f.budget * f.group_size * days
-  return f.budget
+  if (f.budget_unit === "person_trip") return budget * f.group_size
+  if (f.budget_unit === "person_day") return budget * f.group_size * days
+  return budget
 }
 
 /** Form chat -> TripInfo, để trợ lý chat nhớ đúng bản người dùng đã xác nhận. */
@@ -579,7 +581,14 @@ export function TripFormSheet({
   const [kept, setKept] = React.useState<string[]>([])
   const set = <K extends keyof TripForm>(key: K, value: TripForm[K]) => {
     setTouched(true)
-    setForm((f) => ({ ...f, [key]: value }))
+    setForm((f) => ({
+      ...f,
+      [key]: value,
+      // Tự nhập / đổi cách tính ngân sách thì bỏ khoảng đã chọn ở câu hỏi lại.
+      ...(key === "budget" || key === "budget_unit"
+        ? { budget_min: null }
+        : {}),
+    }))
   }
 
   const days = daysBetween(form.start_date, form.end_date)
@@ -590,7 +599,7 @@ export function TripFormSheet({
     pastStart && "ngày đi (không được trước hôm nay)",
     (days < 1 || days > MAX_DAYS) && `ngày về (tối đa ${MAX_DAYS} ngày)`,
     form.group_size < 1 && "số người",
-    !(form.budget && form.budget > 0) && "ngân sách",
+    !((form.budget ?? 0) > 0 || (form.budget_min ?? 0) > 0) && "ngân sách",
   ].filter((x): x is string => Boolean(x))
   const conflicts = conflictsOf(form, chatInfo).filter(
     (c) => !kept.includes(c.id)
