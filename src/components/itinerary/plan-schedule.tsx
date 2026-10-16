@@ -35,11 +35,15 @@ import {
   vehiclesOf,
 } from "./plan-shared"
 
-const STATUS: Record<ItineraryDay["status"], { label: string; cls: string }> = {
+// Ngày "fail" không gắn nhãn (không hiện "Không đi được"): lỗi cụ thể đã ghi ở cuối lịch.
+const STATUS: Record<
+  ItineraryDay["status"],
+  { label: string; cls: string } | null
+> = {
   ok: { label: "Đi được", cls: "bg-trip-jade-bg text-trip-jade" },
   risky: { label: "Sát giờ nếu ở lâu", cls: "bg-trip-warn-bg text-trip-warn" },
   warn: { label: "Cần lưu ý", cls: "bg-trip-warn-bg text-trip-warn" },
-  fail: { label: "Không đi được", cls: "bg-trip-seal-bg text-trip-seal" },
+  fail: null,
 }
 
 export function ScheduleTab({
@@ -64,11 +68,16 @@ export function ScheduleTab({
       </TabIntro>
       <DayPills days={days} value={dayIndex} onChange={onDay} />
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
-        <span
-          className={cn("rounded-full px-2.5 py-0.5 font-semibold", status.cls)}
-        >
-          {status.label}
-        </span>
+        {status && (
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-0.5 font-semibold",
+              status.cls
+            )}
+          >
+            {status.label}
+          </span>
+        )}
         {day.weather && <span className="text-trip-ink-3">{day.weather}</span>}
         {day.metrics.ride_min != null && (
           <span className="text-trip-ink-3">
