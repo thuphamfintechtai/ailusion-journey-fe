@@ -5,7 +5,8 @@
  * - status "need_info": các câu hỏi lại (bước 4), mỗi câu là nút bấm; bấm thì gửi lại form.
  * - status "ok": 3 phương án, mỗi cái nói rõ hơn 2 cái kia ở đâu, đang giả định gì; lịch theo giờ,
  *   chi tiết phương án theo tab (lịch, bản đồ, chi phí, thời tiết, hành lý — xem plan-panel.tsx),
- *   chỗ ở; vượt ngân sách thì hiện 2 lựa chọn (máy không tự cắt).
+ *   chỗ ở; vượt ngân sách thì hiện 2 lựa chọn (máy không tự cắt). Ngân sách thấp so với mặt bằng
+ *   giá của điểm đến (theo mức chi đã chọn) thì báo ngay đầu kết quả, kèm bảng 3 mức.
  */
 
 import * as React from "react"
@@ -23,6 +24,8 @@ import {
   isItineraryResult,
   money,
   trieu,
+  type BudgetLevel,
+  type BudgetLevelRow,
   type ItineraryResult,
   type TripForm,
 } from "@/lib/itinerary"
@@ -159,6 +162,9 @@ function Options({
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+      {result.budget_level && (
+        <BudgetLevelCard level={result.budget_level} onOpenForm={onOpenForm} />
+      )}
       {result.profile && (
         <div className="flex flex-wrap items-center gap-2 text-[13px]">
           <span className="rounded-full bg-trip-fill px-2.5 py-0.5 font-semibold text-trip-on-fill">
@@ -287,6 +293,126 @@ function Options({
         </p>
         <TraceIds threadId={result.thread_id} runId={result.trace_run_id} />
       </div>
+    </div>
+  )
+}
+
+/** 162500 -> "163 nghìn" (giá quán mỗi người, gọn hơn "162.500 đ" trong cột hẹp). */
+function nghin(v: number): string {
+  return `${Math.round(v / 1000).toLocaleString("vi-VN")} nghìn`
+}
+
+/** Các hàng của bảng mức chi: tên hàng (kèm đơn vị) và số của từng mức. */
+const LEVEL_ROWS: [string, (l: BudgetLevelRow) => string][] = [
+  ["Cả chuyến", (l) => trieu(l.total)],
+  ["Phòng / đêm", (l) => trieu(l.stay_night)],
+  ["Quán / người", (l) => nghin(l.meal)],
+]
+
+/**
+ * Ngân sách so với mặt bằng giá của điểm đến, ở đầu kết quả: lời báo theo mức chi user chọn và
+ * bảng 3 mức (tiết kiệm / thường gặp / sang), mức đem so với ngân sách được tô nổi. Dưới cả mức
+ * tiết kiệm thì màu cảnh báo và có nút sửa form.
+ */
+function BudgetLevelCard({
+  level,
+  onOpenForm,
+}: {
+  level: BudgetLevel
+  onOpenForm: () => void
+}) {
+  const warn = level.severity === "warn"
+  return (
+    <div
+      className={cn(
+        "grid gap-2.5 rounded-xl border-[1.5px] p-3 text-[14px]",
+        warn
+          ? "border-trip-seal bg-trip-seal-bg"
+          : "border-trip-sky bg-trip-sky-bg"
+      )}
+    >
+      <p
+        className={cn(
+          "flex items-center gap-2 font-bold",
+          warn ? "text-trip-seal" : "text-trip-sky"
+        )}
+      >
+        {warn ? (
+          <AlertTriangle className="size-4 shrink-0" />
+        ) : (
+          <Info className="size-4 shrink-0" />
+        )}
+        {level.title}
+      </p>
+      <p className="text-trip-ink-2">{level.text}</p>
+      {/* Đơn vị nằm ở tên hàng để ô chỉ còn số ngắn: vừa cả màn hình điện thoại. */}
+      <div className="overflow-x-auto">
+        <table className="w-full border-separate border-spacing-0 text-[12.5px]">
+          <thead>
+            <tr>
+              <th scope="col" />
+              {level.levels.map((l) => (
+                <th
+                  key={l.key}
+                  scope="col"
+                  className={cn(
+                    "rounded-t-lg px-2 pt-1.5 pb-1 text-left align-bottom font-semibold",
+                    l.key === level.target && "bg-trip-sheet"
+                  )}
+                >
+                  {l.label}
+                  <span className="block text-[11px] font-normal text-trip-ink-3 italic">
+                    {l.basis}
+                    {l.key === level.target ? " · đem so" : ""}
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {LEVEL_ROWS.map(([name, cell], i) => (
+              <tr key={name}>
+                <th
+                  scope="row"
+                  className="py-1 pr-2 text-left font-normal whitespace-nowrap text-trip-ink-3"
+                >
+                  {name}
+                </th>
+                {level.levels.map((l) => (
+                  <td
+                    key={l.key}
+                    className={cn(
+                      "px-2 py-1 font-num whitespace-nowrap",
+                      i === 0 && "text-[15px] font-semibold",
+                      l.key === level.target && "bg-trip-sheet",
+                      l.key === level.target &&
+                        i === LEVEL_ROWS.length - 1 &&
+                        "rounded-b-lg"
+                    )}
+                  >
+                    {cell(l)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {level.budget != null && (
+        <p className="text-[13px] text-trip-ink-2">
+          Ngân sách của bạn: <b className="font-num">{trieu(level.budget)}</b>
+        </p>
+      )}
+      <p className="text-[12px] text-trip-ink-3">{level.scope}</p>
+      {warn && (
+        <button
+          type="button"
+          onClick={onOpenForm}
+          className="justify-self-start rounded-lg border border-trip-seal px-3 py-1.5 text-sm font-semibold text-trip-seal"
+        >
+          Sửa trong form
+        </button>
+      )}
     </div>
   )
 }

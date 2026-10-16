@@ -311,6 +311,8 @@ export type ItineraryResult = {
     cheaper_first: boolean
     cheaper_days: string[]
   } | null
+  /** Ngân sách so với mặt bằng giá của điểm đến; không có khi ngân sách đủ mức đã chọn. */
+  budget_level?: BudgetLevel | null
   guesses: string[]
   understood: { field: string; value: string; quote: string }[]
   notes: string[]
@@ -387,6 +389,35 @@ export const PRIORITIES: { id: Priority; label: string; note: string }[] = [
     note: "Nhiều điểm nhất, ít ngồi xe",
   },
 ]
+
+/**
+ * Một mức chi của điểm đến: phòng + ăn cả đoàn cả chuyến theo tứ phân vị giá của cả điểm đến
+ * (tiết kiệm = trung vị nửa rẻ, thường gặp = trung vị, sang = trung vị nửa đắt).
+ */
+export type BudgetLevelRow = {
+  key: "saving" | "normal" | "luxury"
+  label: string
+  basis: string
+  stay_night: number
+  meal: number
+  total: number
+}
+
+/**
+ * Mỗi mức chi so ngân sách với một mức riêng: "Bình thường" với Thường gặp, "Sang, không vượt
+ * ngân sách" với Sang (`target`); dưới cả Tiết kiệm thì `severity` "warn". "Không giới hạn" không
+ * so ngân sách (`target` null), chỉ báo tổng ước.
+ */
+export type BudgetLevel = {
+  severity: "warn" | "info"
+  title: string
+  text: string
+  style: SpendStyle
+  target: "normal" | "luxury" | null
+  budget: number | null
+  levels: BudgetLevelRow[]
+  scope: string
+}
 
 export const SPEND_STYLES: { id: SpendStyle; label: string }[] = [
   { id: "normal", label: "Bình thường" },
