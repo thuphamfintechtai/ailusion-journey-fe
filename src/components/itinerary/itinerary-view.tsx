@@ -311,8 +311,9 @@ const LEVEL_ROWS: [string, (l: BudgetLevelRow) => string][] = [
 
 /**
  * Ngân sách so với mặt bằng giá của điểm đến, ở đầu kết quả: lời báo theo mức chi user chọn và
- * bảng 3 mức (tiết kiệm / thường gặp / sang), mức đem so với ngân sách được tô nổi. Dưới cả mức
- * tiết kiệm thì màu cảnh báo và có nút sửa form.
+ * bảng 3 mức (tiết kiệm / thường gặp / sang), mức đem so với ngân sách được tô nổi, ngân sách
+ * quy về cả đoàn cả chuyến kèm phép tính. Dưới cả mức tiết kiệm thì màu cảnh báo; thiếu hoặc dư
+ * ngân sách thì có nút sửa form.
  */
 function BudgetLevelCard({
   level,
@@ -398,13 +399,14 @@ function BudgetLevelCard({
           </tbody>
         </table>
       </div>
-      {level.budget != null && (
+      {(level.budget_text || level.budget != null) && (
         <p className="text-[13px] text-trip-ink-2">
-          Ngân sách của bạn: <b className="font-num">{trieu(level.budget)}</b>
+          Ngân sách của bạn:{" "}
+          <b className="font-num">{level.budget_text ?? trieu(level.budget)}</b>
         </p>
       )}
       <p className="text-[12px] text-trip-ink-3">{level.scope}</p>
-      {warn && (
+      {(warn || level.kind === "surplus") && (
         <button
           type="button"
           onClick={onOpenForm}

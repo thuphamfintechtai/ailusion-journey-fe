@@ -405,16 +405,20 @@ export type BudgetLevelRow = {
 
 /**
  * Mỗi mức chi so ngân sách với một mức riêng: "Bình thường" với Thường gặp, "Sang, không vượt
- * ngân sách" với Sang (`target`); dưới cả Tiết kiệm thì `severity` "warn". "Không giới hạn" không
- * so ngân sách (`target` null), chỉ báo tổng ước.
+ * ngân sách" với Sang (`target`); dưới cả Tiết kiệm thì `severity` "warn" (`kind` "low"), dưới
+ * mức đem so là "below". Ngân sách trên cả mức Sang mà lịch vẫn tiêu dưới khoảng ngân sách là
+ * "surplus" (chỗ rẻ, ngân sách cao). "Không giới hạn" không so ngân sách (`target` null), chỉ
+ * báo tổng ước. `budget_text`: ngân sách quy về cả đoàn cả chuyến kèm phép tính.
  */
 export type BudgetLevel = {
+  kind?: "low" | "below" | "surplus" | "unlimited"
   severity: "warn" | "info"
   title: string
   text: string
   style: SpendStyle
   target: "normal" | "luxury" | null
   budget: number | null
+  budget_text?: string | null
   levels: BudgetLevelRow[]
   scope: string
 }
