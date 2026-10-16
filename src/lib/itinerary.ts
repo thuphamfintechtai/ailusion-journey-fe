@@ -52,6 +52,9 @@ export type TripForm = {
   end_date: string
   group_size: number
   budget?: number | null
+  /** Mức dưới khi user chọn khoảng ngân sách ở câu hỏi lại ("3–6 triệu", "trên 10 triệu"):
+   * ngân sách là khoảng budget_min–budget (budget trống = không trần). */
+  budget_min?: number | null
   budget_unit?: BudgetUnit
   stay_booked?: string | null
   prepaid_tickets?: number
