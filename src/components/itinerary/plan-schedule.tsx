@@ -4,6 +4,7 @@
 
 import * as React from "react"
 import {
+  Baby,
   BedDouble,
   CalendarClock,
   Coffee,
@@ -104,6 +105,19 @@ export function ScheduleTab({
           <Utensils className="mt-0.5 size-4 shrink-0 text-trip-ink-3" />
           <span>{(day.meal_notes ?? []).join(" · ")}</span>
         </p>
+      )}
+      {(day.kid_notes ?? []).length > 0 && (
+        <div
+          aria-label="Lưu ý vì đi cùng trẻ em"
+          className="flex gap-2 text-[13px] text-trip-ink-2"
+        >
+          <Baby className="mt-0.5 size-4 shrink-0 text-trip-ink-3" />
+          <ul className="grid gap-0.5">
+            {(day.kid_notes ?? []).map((x) => (
+              <li key={x}>{x}</li>
+            ))}
+          </ul>
+        </div>
       )}
       {day.area_note && (
         <p className="flex gap-2 text-[13px] text-trip-ink-2">
