@@ -19,6 +19,7 @@ import {
 
 import { BrandMark } from "@/components/brand"
 import { ItineraryView } from "@/components/itinerary/itinerary-view"
+import { PlanLoading } from "@/components/itinerary/plan-loading"
 import { PlanTrace } from "@/components/itinerary/plan-trace"
 import type { PlanEvent } from "@/lib/api"
 import type { ItineraryResult, TripForm } from "@/lib/itinerary"
@@ -390,7 +391,14 @@ function PlanBubble({
           />
         </>
       ) : (
-        <PlanTrace events={plan.events} running />
+        <>
+          {/* Lời thường cho mọi người; nhật ký kỹ thuật thu gọn, ai cần thì mở. */}
+          <PlanLoading
+            events={plan.events}
+            destination={plan.form.destination}
+          />
+          <PlanTrace events={plan.events} running collapsible />
+        </>
       )}
     </div>
   )

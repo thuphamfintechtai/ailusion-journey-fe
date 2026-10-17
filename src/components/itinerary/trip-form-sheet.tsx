@@ -12,6 +12,7 @@
 import * as React from "react"
 import { Dialog } from "radix-ui"
 import {
+  ChevronDown,
   CircleAlert,
   LoaderCircle,
   Minus,
@@ -45,6 +46,16 @@ import { cn } from "@/lib/utils"
 import { conflictsOf, type Conflict } from "./trip-conflicts"
 
 const MAX_DAYS = 7
+// Phần không bắt buộc của form: mặc định thu gọn (form dài), tiêu đề hiện tóm tắt điều đã điền.
+const OPTIONAL_PANELS = [
+  "musts",
+  "group",
+  "times",
+  "purposes",
+  "priority",
+  "message",
+] as const
+type PanelId = (typeof OPTIONAL_PANELS)[number]
 const PLACES = [
   "Đà Lạt",
   "Đà Nẵng",
@@ -85,6 +96,7 @@ function emptyForm(): TripForm {
     group_size: 2,
     budget: null,
     budget_unit: "group_trip",
+    budget_unknown: false,
     message: "",
     group_type: null,
     kids_under_6: 0,
@@ -159,6 +171,7 @@ function toRequest(f: TripForm): TripForm {
     if (k === "night_out" && v === false) continue
     if (k === "nap" && v === "auto") continue
     if (k === "spend_style" && v === "normal") continue
+    if (k === "budget_unknown" && v === false) continue
     if (k === "budget_unit" && !f.budget) continue
     out[k] = v
   }
@@ -373,24 +386,131 @@ function ChipGrid({
   )
 }
 
+/**
+ * Một phần của form. Có `onToggle` thì thu gọn / mở được (form dài: phần không bắt buộc mặc định
+ * thu gọn): thu gọn thì dưới tiêu đề là tóm tắt điều đã điền, mở thì là gợi ý của phần.
+ */
 function Panel({
   title,
   hint,
+  summary,
+  open,
+  onToggle,
   children,
 }: {
   title: string
   hint?: string
+  summary?: string
+  open?: boolean
+  onToggle?: () => void
   children: React.ReactNode
 }) {
+  const contentId = React.useId()
+  if (!onToggle)
+    return (
+      <section className="grid gap-4 rounded-2xl border border-trip-line bg-trip-sheet p-4 shadow-xs sm:p-5">
+        <header className="grid gap-0.5">
+          <h3 className="text-[15.5px] font-bold text-trip-ink">{title}</h3>
+          {hint && <p className="text-[13px] text-trip-ink-3">{hint}</p>}
+        </header>
+        {children}
+      </section>
+    )
   return (
     <section className="grid gap-4 rounded-2xl border border-trip-line bg-trip-sheet p-4 shadow-xs sm:p-5">
-      <header className="grid gap-0.5">
-        <h3 className="text-[15.5px] font-bold text-trip-ink">{title}</h3>
-        {hint && <p className="text-[13px] text-trip-ink-3">{hint}</p>}
-      </header>
-      {children}
+      <h3 className="-m-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-controls={contentId}
+          className="flex min-h-11 w-full items-start gap-3 rounded-xl p-2 text-left outline-none hover:bg-trip-sheet-2 focus-visible:ring-[3px] focus-visible:ring-trip-sky/30"
+        >
+          <span className="grid min-w-0 flex-1 gap-0.5">
+            <span className="text-[15.5px] font-bold text-trip-ink">
+              {title}
+            </span>
+            <span
+              className={cn(
+                "text-[13px]",
+                open ? "text-trip-ink-3" : "line-clamp-2 text-trip-ink-2"
+              )}
+            >
+              {open ? hint : summary || "Chưa điền — không bắt buộc"}
+            </span>
+          </span>
+          <ChevronDown
+            aria-hidden
+            className={cn(
+              "mt-0.5 size-5 shrink-0 text-trip-ink-3 transition-transform duration-200 motion-reduce:transition-none",
+              open && "rotate-180"
+            )}
+          />
+        </button>
+      </h3>
+      {open && (
+        <div
+          id={contentId}
+          className="grid animate-in gap-4 duration-200 fade-in motion-reduce:animate-none"
+        >
+          {children}
+        </div>
+      )}
     </section>
   )
+}
+
+/** Điều đã điền ở một phần không bắt buộc, hiện khi phần đó thu gọn; rỗng = chưa điền. */
+function summaryOf(f: TripForm, id: PanelId): string {
+  const label = (list: { id: string; label: string }[], v?: string | null) =>
+    list.find((x) => x.id === v)?.label
+  const at = (v: string) => label(ARRIVAL_BUCKETS, v)?.toLowerCase() ?? v
+  const busy = f.busy_slots ?? []
+  let parts: (string | false | null | undefined)[]
+  switch (id) {
+    case "musts":
+      return (f.must_visits ?? [])
+        .map((m) => m.name.trim())
+        .filter(Boolean)
+        .join(", ")
+    case "group":
+      parts = [
+        label(GROUP_TYPES, f.group_type),
+        !!f.kids_under_6 && `${f.kids_under_6} bé dưới 6 tuổi`,
+        !!f.kids_6_12 && `${f.kids_6_12} trẻ 6–12 tuổi`,
+        !!f.seniors_65 && `${f.seniors_65} người từ 65 tuổi`,
+        !!f.wheelchair_users && `${f.wheelchair_users} người ngồi xe lăn`,
+        ...(f.required_needs ?? []).map((n) => label(NEEDS, n) ?? n),
+        f.needs_note?.trim(),
+      ]
+      break
+    case "times":
+      parts = [
+        f.arrival_time && `tới ${at(f.arrival_time)}`,
+        f.departure_time && `về ${at(f.departure_time)}`,
+        f.wake_time && `dậy ${f.wake_time}`,
+        f.night_return_time && `tối về trước ${f.night_return_time}`,
+        f.night_out && "đi chơi đêm",
+        busy.length > 0 && `${busy.length} lịch bận`,
+      ]
+      break
+    case "purposes":
+      parts = [
+        ...(f.purposes ?? []).map((p) => label(PURPOSES, p) ?? p),
+        f.interests?.trim(),
+        label(WALKING, f.walking_level),
+      ]
+      break
+    case "priority":
+      parts = [
+        label(PRIORITIES, f.priority),
+        label(SPEND_STYLES, f.spend_style),
+      ]
+      break
+    case "message":
+      return f.message?.trim() ?? ""
+  }
+  return parts.filter(Boolean).join(" · ")
 }
 
 function Field({
@@ -425,10 +545,12 @@ function Field({
 function Chip({
   on,
   onClick,
+  className,
   children,
 }: {
   on: boolean
   onClick: () => void
+  className?: string
   children: React.ReactNode
 }) {
   return (
@@ -440,7 +562,8 @@ function Chip({
         "inline-flex h-10 items-center justify-center gap-1.5 rounded-full border px-3.5 text-sm whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-trip-fill/25",
         on
           ? "border-trip-fill bg-trip-fill font-semibold text-trip-on-fill"
-          : "border-trip-line-2 bg-trip-sheet text-trip-ink hover:border-trip-fill/50 hover:bg-trip-sheet-2"
+          : "border-trip-line-2 bg-trip-sheet text-trip-ink hover:border-trip-fill/50 hover:bg-trip-sheet-2",
+        className
       )}
     >
       {children}
@@ -596,6 +719,8 @@ export function TripFormSheet({
       ...(key === "budget" || key === "budget_unit"
         ? { budget_min: null }
         : {}),
+      // Nhập / chọn số ngân sách thì bỏ "Không giới hạn" (chưa biết).
+      ...(key === "budget" && value ? { budget_unknown: false } : {}),
       // "Một mình" khớp 1 người (form mặc định 2 người: chọn "Một mình" mà quên sửa số người thì
       // LLM từ chối "Đi một mình nhưng số người là 2").
       ...(key === "group_type" && value === "solo" ? { group_size: 1 } : {}),
@@ -616,7 +741,11 @@ export function TripFormSheet({
     pastStart && "ngày đi (không được trước hôm nay)",
     (days < 1 || days > MAX_DAYS) && `ngày về (tối đa ${MAX_DAYS} ngày)`,
     form.group_size < 1 && "số người",
-    !((form.budget ?? 0) > 0 || (form.budget_min ?? 0) > 0) && "ngân sách",
+    !(
+      (form.budget ?? 0) > 0 ||
+      (form.budget_min ?? 0) > 0 ||
+      form.budget_unknown
+    ) && "ngân sách",
   ].filter((x): x is string => Boolean(x))
   const conflicts = conflictsOf(form, chatInfo).filter(
     (c) => !kept.includes(c.id)
@@ -691,6 +820,15 @@ export function TripFormSheet({
       "busy_slots",
       busy.map((b, j) => (j === i ? { ...b, ...patch } : b))
     )
+
+  const [opened, setOpened] = React.useState<PanelId[]>([])
+  const togglePanel = (id: PanelId) =>
+    setOpened((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]))
+  const panel = (id: PanelId) => ({
+    open: opened.includes(id),
+    onToggle: () => togglePanel(id),
+    summary: summaryOf(form, id),
+  })
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -811,7 +949,9 @@ export function TripFormSheet({
                 <Field
                   label="Ngân sách (triệu đồng)"
                   htmlFor="tf-budget"
-                  missing={!(form.budget && form.budget > 0)}
+                  missing={
+                    !(form.budget && form.budget > 0) && !form.budget_unknown
+                  }
                 >
                   <ChipGrid min={52}>
                     {budgets.map((b) => (
@@ -829,7 +969,29 @@ export function TripFormSheet({
                         <span className="font-num font-semibold">{b}</span>
                       </Chip>
                     ))}
+                    <Chip
+                      className="col-span-3"
+                      on={Boolean(form.budget_unknown)}
+                      onClick={() => {
+                        setBudgetText("")
+                        setTouched(true)
+                        setForm((f) => ({
+                          ...f,
+                          budget_unknown: !f.budget_unknown,
+                          budget: null,
+                          budget_min: null,
+                        }))
+                      }}
+                    >
+                      Không giới hạn
+                    </Chip>
                   </ChipGrid>
+                  {form.budget_unknown && (
+                    <p className="text-[12.5px] leading-snug text-trip-ink-3">
+                      Chưa biết bao nhiêu: lịch theo mức chi thường gặp ở điểm
+                      đến (không chọn chỗ đắt nhất), xong sẽ báo tổng ước.
+                    </p>
+                  )}
                   <input
                     id="tf-budget"
                     inputMode="decimal"
@@ -890,7 +1052,29 @@ export function TripFormSheet({
                 </div>
               </Panel>
 
+              <div className="flex items-center justify-between gap-3 px-1">
+                <p className="text-[13px] text-trip-ink-3">
+                  Các phần dưới không bắt buộc — mở ra khi cần.
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpened((o) =>
+                      o.length === OPTIONAL_PANELS.length
+                        ? []
+                        : [...OPTIONAL_PANELS]
+                    )
+                  }
+                  className="min-h-11 shrink-0 rounded-[10px] px-2 text-[13.5px] font-semibold text-trip-sky outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-trip-sky/30"
+                >
+                  {opened.length === OPTIONAL_PANELS.length
+                    ? "Thu gọn tất cả"
+                    : "Mở tất cả"}
+                </button>
+              </div>
+
               <Panel
+                {...panel("musts")}
                 title="Địa điểm muốn đi"
                 hint="Chỗ bạn nhất định muốn ghé. Chọn ngày, giờ nếu đã có hẹn; để “bất kỳ” thì máy tự xếp cho hợp đường."
               >
@@ -927,6 +1111,7 @@ export function TripFormSheet({
               </Panel>
 
               <Panel
+                {...panel("group")}
                 title="Đi cùng ai"
                 hint="Để máy biết đoàn cần gì: chỗ hợp trẻ em, nhà vệ sinh, lối xe lăn, lịch đỡ mệt."
               >
@@ -1008,6 +1193,7 @@ export function TripFormSheet({
               </Panel>
 
               <Panel
+                {...panel("times")}
                 title="Khung giờ"
                 hint="Để trống thì ngày bắt đầu 08:00, ngày cuối về 15:00; giờ về buổi tối sẽ hỏi lại (chưa biết thì 20:00)."
               >
@@ -1138,6 +1324,7 @@ export function TripFormSheet({
               </Panel>
 
               <Panel
+                {...panel("purposes")}
                 title="Mục đích"
                 hint="Chọn tối đa 2, theo thứ tự quan trọng."
               >
@@ -1194,6 +1381,7 @@ export function TripFormSheet({
               </Panel>
 
               <Panel
+                {...panel("priority")}
                 title="Khi phải chọn, bạn ưu tiên"
                 hint="Bỏ trống thì máy tự suy ra từ đoàn và giờ rảnh."
               >
@@ -1242,6 +1430,7 @@ export function TripFormSheet({
               </Panel>
 
               <Panel
+                {...panel("message")}
                 title="Lời nhắn"
                 hint="Viết tự do điều form chưa có, ví dụ “ông bà đi lại chậm”, “ngày 2 dự tiệc từ 5 giờ chiều”."
               >
