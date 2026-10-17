@@ -203,6 +203,8 @@ export type ItineraryDay = {
   area_note?: string | null
   /** Bữa không xếp / tuỳ chọn và lý do (VD bắt đầu 10:00 nên bữa sáng tuỳ chọn). */
   meal_notes?: string[]
+  /** Đoàn có trẻ em: chỗ trong ngày cần lưu ý vì có trẻ và nên làm gì. */
+  kid_notes?: string[]
   /** Ngày âm lịch, VD "10/9". */
   lunar?: string | null
   holiday?: string | null
