@@ -56,6 +56,8 @@ export type TripForm = {
    * ngân sách là khoảng budget_min–budget (budget trống = không trần). */
   budget_min?: number | null
   budget_unit?: BudgetUnit
+  /** Ô ngân sách chọn "Không giới hạn": chưa biết bao nhiêu (không phải chi thoải mái). */
+  budget_unknown?: boolean
   stay_booked?: string | null
   prepaid_tickets?: number
   travel_mode?: TravelMode | null
@@ -415,7 +417,7 @@ export type BudgetLevelRow = {
  * báo tổng ước. `budget_text`: ngân sách quy về cả đoàn cả chuyến kèm phép tính.
  */
 export type BudgetLevel = {
-  kind?: "low" | "below" | "surplus" | "unlimited"
+  kind?: "low" | "below" | "surplus" | "unlimited" | "unknown"
   severity: "warn" | "info"
   title: string
   text: string
@@ -430,7 +432,7 @@ export type BudgetLevel = {
 export const SPEND_STYLES: { id: SpendStyle; label: string }[] = [
   { id: "normal", label: "Bình thường" },
   { id: "luxury_within_budget", label: "Sang, không vượt ngân sách" },
-  { id: "unlimited", label: "Không giới hạn" },
+  { id: "unlimited", label: "Không ngại chi thêm" },
 ]
 
 export const NAP_OPTIONS: { id: Nap; label: string }[] = [
