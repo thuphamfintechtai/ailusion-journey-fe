@@ -23,7 +23,8 @@ import { CostTab } from "./plan-cost"
 import { MapTab } from "./plan-map"
 import { PackingTab } from "./plan-packing"
 import { ScheduleTab } from "./plan-schedule"
-import { TripContext, trieuRange } from "./plan-shared"
+import { moneyRange, TripContext, trieuRange } from "./plan-shared"
+import type { SkipCut } from "./plan-skip"
 import { WeatherTab } from "./plan-weather"
 
 type Tab = "schedule" | "map" | "cost" | "weather" | "packing"
@@ -39,9 +40,16 @@ const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
 export function PlanPanel({
   result,
   option,
+  cut,
+  onSkip,
+  onKeepAll,
 }: {
   result: ItineraryResult
   option: ItineraryOption
+  /** Chỗ người dùng đã bấm "Xoá" ở phương án này và tiền đã bớt (plan-skip.ts). */
+  cut?: SkipCut
+  onSkip?: (key: string) => void
+  onKeepAll?: () => void
 }) {
   const id = React.useId()
   const trip = React.useMemo(
@@ -132,6 +140,42 @@ export function PlanPanel({
           </span>
         </div>
 
+        {/* Chỗ đã xoá ở tab Lịch trình: tổng đã bớt, và giữ lại tất cả một lần. */}
+        {cut && cut.count > 0 && (
+          <div
+            role="status"
+            className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-trip-sheet-2 px-3 py-1.5 text-[13.5px] text-trip-ink-2"
+          >
+            <span className="grid min-w-0 gap-0.5">
+              <span>
+                Đã xoá <b className="text-trip-ink">{cut.count} chỗ</b>
+                {cut.high > 0 && (
+                  <>
+                    {" "}
+                    · bớt{" "}
+                    <b className="font-num text-trip-ink">
+                      {moneyRange(cut.low, cut.high)}
+                    </b>{" "}
+                    khỏi chi phí
+                  </>
+                )}
+              </span>
+              <span className="text-[12px] text-trip-ink-3">
+                Giờ, đường đi và phát sinh vẫn theo lịch gốc.
+              </span>
+            </span>
+            {onKeepAll && (
+              <button
+                type="button"
+                onClick={onKeepAll}
+                className="min-h-9 rounded-lg px-2 font-semibold text-trip-sky outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-trip-sky/30"
+              >
+                Giữ lại tất cả
+              </button>
+            )}
+          </div>
+        )}
+
         <div
           role="tabpanel"
           id={`${id}-panel-${tab}`}
@@ -145,6 +189,7 @@ export function PlanPanel({
               dayIndex={dayIndex}
               onDay={setDayIndex}
               destination={result.destination}
+              onSkip={onSkip}
             />
           )}
           {tab === "map" && (

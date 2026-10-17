@@ -429,6 +429,8 @@ type Line = {
   extra?: boolean
   /** Chữ thay cho số tiền (VD chặng tự lái "trong tiền thuê xe"). */
   label?: string
+  /** Chỗ người dùng đã xoá ở tab Lịch trình: gạch ngang, không cộng vào tổng. */
+  skipped?: boolean
 }
 
 /** Các khoản của một ngày theo thứ tự đi: chặng xe, điểm/bữa, rồi tiền phòng đêm đó. */
@@ -516,6 +518,7 @@ function linesOf(
             ? "không ước tính"
             : undefined,
         part: meal ? "food" : "tickets",
+        skipped: item.skipped,
       })
     }
   })
@@ -625,10 +628,13 @@ function groupsOf(
   return groups
 }
 
-/** Cộng (thấp, cao) các khoản của một nhóm; khoản chưa có giá tính 0. */
+/** Cộng (thấp, cao) các khoản của một nhóm; khoản chưa có giá tính 0, chỗ đã xoá không cộng. */
 function sumOf(lines: Line[]): [number, number] {
   return lines.reduce<[number, number]>(
-    ([lo, hi], l) => [lo + (l.amount?.[0] ?? 0), hi + (l.amount?.[1] ?? 0)],
+    ([lo, hi], l) =>
+      l.skipped
+        ? [lo, hi]
+        : [lo + (l.amount?.[0] ?? 0), hi + (l.amount?.[1] ?? 0)],
     [0, 0]
   )
 }
@@ -646,15 +652,14 @@ function DayCost({
   const vehicles = vehiclesOf(useTrip().party)
   const lines = linesOf(day, stay, night, vehicles)
   // Không có chi phí ngày từ LLM thì cộng các khoản ở dưới (lấy giữa khoảng cho thanh chia).
+  // Có thì `day.cost` đã trừ chỗ đã xoá (plan-skip.ts).
   const total = day.cost
     ? rangeOf(day.cost.total_min, day.cost.total_max, day.cost.total)
-    : rangeOf(
-        lines.reduce((s, l) => s + (l.amount?.[0] ?? 0), 0),
-        lines.reduce((s, l) => s + (l.amount?.[1] ?? 0), 0)
-      )
+    : rangeOf(...sumOf(lines))
   const split: Split =
     day.cost ??
     lines.reduce<Split>((acc, l) => {
+      if (l.skipped) return acc
       const mid = l.amount ? (l.amount[0] + l.amount[1]) / 2 : 0
       acc[l.part] = (acc[l.part] ?? 0) + mid
       return acc
@@ -713,15 +718,32 @@ function DayCost({
                           key={l.key}
                           className="flex items-center gap-2.5 py-2 text-[13px]"
                         >
-                          <Icon className={cn("size-4 shrink-0", l.iconCls)} />
+                          <Icon
+                            className={cn(
+                              "size-4 shrink-0",
+                              l.skipped ? "text-trip-ink-3" : l.iconCls
+                            )}
+                          />
                           <span className="grid min-w-0 flex-1">
                             <span className="flex min-w-0 items-center gap-1.5">
-                              <span className="truncate text-trip-ink-2">
+                              <span
+                                className={cn(
+                                  "truncate",
+                                  l.skipped
+                                    ? "text-trip-ink-3 line-through"
+                                    : "text-trip-ink-2"
+                                )}
+                              >
                                 {l.name}
                               </span>
                               {l.extra && (
                                 <span className="shrink-0 rounded bg-trip-sheet-2 px-1.5 text-[11px] font-semibold text-trip-ink-3">
                                   phát sinh
+                                </span>
+                              )}
+                              {l.skipped && (
+                                <span className="shrink-0 rounded bg-trip-sheet-2 px-1.5 text-[11px] font-semibold text-trip-ink-2">
+                                  đã xoá, không tính
                                 </span>
                               )}
                             </span>
@@ -734,9 +756,11 @@ function DayCost({
                           <span
                             className={cn(
                               "shrink-0 font-num",
-                              l.amount?.[1]
-                                ? "font-semibold"
-                                : "text-trip-ink-3"
+                              l.skipped
+                                ? "text-trip-ink-3 line-through"
+                                : l.amount?.[1]
+                                  ? "font-semibold"
+                                  : "text-trip-ink-3"
                             )}
                           >
                             {l.label ??

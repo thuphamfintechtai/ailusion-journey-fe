@@ -1,6 +1,9 @@
 "use client"
 
-/** Tab "Lịch trình": từng điểm theo giờ, giữa hai điểm là chặng đi (phương tiện, phút, km, tiền). */
+/**
+ * Tab "Lịch trình": từng điểm theo giờ, giữa hai điểm là chặng đi (phương tiện, phút, km, tiền).
+ * Dưới giờ mỗi điểm có nút "Xoá": gạch ngang và trừ tiền chỗ đó; bấm "Giữ lại" thì như cũ.
+ */
 
 import * as React from "react"
 import {
@@ -14,7 +17,9 @@ import {
   PlaneTakeoff,
   Route,
   TriangleAlert,
+  Undo2,
   Utensils,
+  X,
 } from "lucide-react"
 
 import {
@@ -37,6 +42,7 @@ import {
   useTrip,
   vehiclesOf,
 } from "./plan-shared"
+import { skipKey } from "./plan-skip"
 
 // Ngày "fail" không gắn nhãn (không hiện "Không đi được"): lỗi cụ thể đã ghi ở cuối lịch.
 const STATUS: Record<
@@ -54,11 +60,14 @@ export function ScheduleTab({
   dayIndex,
   onDay,
   destination,
+  onSkip,
 }: {
   days: ItineraryDay[]
   dayIndex: number
   onDay: (i: number) => void
   destination?: string | null
+  /** Bấm "Xoá" / "Giữ lại" một chỗ (khoá theo `skipKey`). */
+  onSkip?: (key: string) => void
 }) {
   const [open, setOpen] = React.useState<ItineraryItem | null>(null)
   const day = days[dayIndex] ?? days[0]
@@ -134,8 +143,22 @@ export function ScheduleTab({
           <React.Fragment key={`${item.start}-${i}`}>
             {i > 0 && <LegRow item={item} />}
             <li className="grid grid-cols-[52px_minmax(0,1fr)] gap-3 py-2">
-              <span className="font-num text-[17px] font-semibold">
-                {item.start}
+              {/* Nút xoá nằm dưới giờ (cột giờ còn trống), không lấy bớt bề ngang của thẻ. */}
+              <span className="grid content-start justify-items-start gap-1">
+                <span
+                  className={cn(
+                    "font-num text-[17px] font-semibold",
+                    item.skipped && "text-trip-ink-3 line-through"
+                  )}
+                >
+                  {item.start}
+                </span>
+                {onSkip && (item.type === "visit" || item.type === "meal") && (
+                  <SkipButton
+                    item={item}
+                    onToggle={() => onSkip(skipKey(day.day, item, i))}
+                  />
+                )}
               </span>
               {item.type === "visit" || item.type === "meal" ? (
                 <PlaceCard item={item} onOpen={() => setOpen(item)} />
@@ -223,6 +246,42 @@ function LegRow({ item }: { item: ItineraryItem }) {
   )
 }
 
+/** Xoá một chỗ khỏi lịch (gạch ngang, trừ tiền) hoặc giữ lại như cũ. */
+function SkipButton({
+  item,
+  onToggle,
+}: {
+  item: ItineraryItem
+  onToggle: () => void
+}) {
+  const Icon = item.skipped ? Undo2 : X
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={
+        item.skipped
+          ? `Giữ lại ${item.name}`
+          : `Xoá ${item.name} khỏi lịch, trừ tiền khỏi chi phí`
+      }
+      title={
+        item.skipped
+          ? "Giữ lại chỗ này, tính tiền như cũ"
+          : "Không đi chỗ này: gạch đi và trừ tiền"
+      }
+      className={cn(
+        "grid min-h-11 min-w-11 place-items-center gap-0.5 rounded-lg px-1 py-1 text-[11.5px] leading-none font-semibold transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-trip-sky/30",
+        item.skipped
+          ? "bg-trip-sheet-2 text-trip-sky hover:bg-trip-sky/10"
+          : "text-trip-ink-3 hover:bg-trip-seal-bg hover:text-trip-seal"
+      )}
+    >
+      <Icon aria-hidden className="size-4" />
+      {item.skipped ? "Giữ lại" : "Xoá"}
+    </button>
+  )
+}
+
 /** Một điểm tham quan / bữa ăn, chỉ phần cốt lõi; lý do chọn, giới thiệu, lưu ý nằm ở chi tiết. */
 function PlaceCard({
   item,
@@ -240,18 +299,40 @@ function PlaceCard({
       : null,
   ].filter(Boolean)
   const { groupSize } = useTrip()
+  const skipped = !!item.skipped
+  const price = skipped
+    ? rangeOf(item.price_min, item.price_max, item.price)
+    : null
   return (
     <button
       type="button"
       aria-haspopup="dialog"
-      aria-label={`Xem chi tiết ${item.name}`}
+      aria-label={`Xem chi tiết ${item.name}${skipped ? " (đã xoá)" : ""}`}
       onClick={onOpen}
-      className="group flex min-w-0 items-center gap-3 rounded-xl border border-trip-line bg-trip-paper p-2.5 text-left transition-colors outline-none hover:border-trip-line-2 hover:bg-trip-sheet-2/40 focus-visible:ring-[3px] focus-visible:ring-trip-sky/30"
+      className={cn(
+        "group flex min-w-0 items-center gap-3 rounded-xl border p-2.5 text-left transition-colors outline-none hover:border-trip-line-2 hover:bg-trip-sheet-2/40 focus-visible:ring-[3px] focus-visible:ring-trip-sky/30",
+        skipped
+          ? "border-dashed border-trip-line-2 bg-trip-sheet"
+          : "border-trip-line bg-trip-paper"
+      )}
     >
-      <Thumb key={item.image ?? ""} src={item.image} icon={Icon} meal={meal} />
+      <Thumb
+        key={item.image ?? ""}
+        src={item.image}
+        icon={Icon}
+        meal={meal}
+        className={skipped ? "opacity-50 grayscale" : undefined}
+      />
       <span className="grid min-w-0 flex-1 content-start gap-0.5">
         <span className="flex flex-wrap items-baseline gap-x-1.5 text-[15px] leading-snug font-semibold">
-          <span className="min-w-0">{item.name}</span>
+          <span
+            className={cn(
+              "min-w-0",
+              skipped && "text-trip-ink-3 line-through decoration-2"
+            )}
+          >
+            {item.name}
+          </span>
           {item.must && (
             <span className="self-center rounded-full bg-trip-lotus-bg px-2 py-px text-[11.5px] font-bold text-trip-lotus">
               Bạn chọn
@@ -274,10 +355,21 @@ function PlaceCard({
             {meta.join(" · ")}
           </span>
         )}
-        <span className="flex items-center gap-1.5 text-[12.5px] text-trip-ink-3">
-          {priceText(item, groupSize)}
+        <span className="flex flex-wrap items-center gap-x-1.5 text-[12.5px] text-trip-ink-3">
+          {/* Đã xoá: giá cũ gạch ngang (đã trừ khỏi chi phí), như dòng đó ở tab Chi phí. */}
+          {skipped && (
+            <span className="font-semibold text-trip-ink-2">Đã xoá</span>
+          )}
+          {!skipped ? (
+            priceText(item, groupSize)
+          ) : price && price[1] > 0 ? (
+            <s>
+              <span className="sr-only">đã trừ </span>
+              {priceText(item, groupSize)}
+            </s>
+          ) : null}
           {/* Có chờ mở cửa thì để dấu nhỏ, chi tiết xem trong ngăn. */}
-          {item.wait_min > 0 && (
+          {!skipped && item.wait_min > 0 && (
             <TriangleAlert
               className="size-3.5 shrink-0 text-trip-warn"
               aria-label={`Chờ mở cửa ${item.wait_min} phút`}
@@ -298,14 +390,18 @@ function Thumb({
   src,
   icon: Icon,
   meal,
+  className,
 }: {
   src?: string | null
   icon: typeof MapPin
   meal: boolean
+  className?: string
 }) {
   const [broken, setBroken] = React.useState(false)
-  const box =
-    "block size-14 shrink-0 overflow-hidden rounded-lg bg-trip-sheet-2 sm:size-[72px]"
+  const box = cn(
+    "block size-14 shrink-0 overflow-hidden rounded-lg bg-trip-sheet-2 transition sm:size-[72px]",
+    className
+  )
   if (!src || broken)
     return (
       <span className={cn(box, "grid place-items-center")} aria-hidden>
