@@ -1278,10 +1278,18 @@ export function TripFormSheet({
                           }
                           className={cn(INPUT, "w-[120px]")}
                         />
-                        {!b.busy_end && (
+                        {/* Ô giờ kiểu 24 giờ: "tới nửa đêm" là 00:00, giờ xong không sau giờ
+                            bắt đầu thì máy hiểu là bận tới hết ngày. */}
+                        {!b.busy_end ? (
                           <span className="text-[12.5px] text-trip-ink-3">
                             chưa biết giờ xong
                           </span>
+                        ) : (
+                          b.busy_end <= b.busy_start && (
+                            <span className="text-[12.5px] text-trip-ink-3">
+                              qua nửa đêm: bận tới hết ngày
+                            </span>
+                          )
                         )}
                         <button
                           type="button"
