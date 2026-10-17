@@ -191,8 +191,10 @@ function stopsOf(days: MapDay[], stay: ItineraryResult["stay"]): Stops {
         })
       points.push(stop)
     }
-    // Không có mục "back": vẫn khép tuyến về chỗ ở.
-    if (homeStop && points.length > 1 && points.at(-1) !== homeStop)
+    // Không có mục "back": vẫn khép tuyến về chỗ ở — trừ ngày cuối đi thẳng từ chỗ bận ra bến
+    // ("depart"): tuyến dừng ở chỗ cuối.
+    const departs = day.items.some((item) => item.type === "depart")
+    if (homeStop && points.length > 1 && points.at(-1) !== homeStop && !departs)
       points.push(homeStop)
     routes.push({ color, points, legs, path: pathOf(day) })
   }

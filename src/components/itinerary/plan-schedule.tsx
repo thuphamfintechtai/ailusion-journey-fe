@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ExternalLink,
   MapPin,
+  PlaneTakeoff,
   Route,
   TriangleAlert,
   Utensils,
@@ -128,6 +129,8 @@ export function ScheduleTab({
                 <p className="flex flex-wrap items-center gap-1.5 text-[15px] font-semibold">
                   {item.type === "busy" ? (
                     <CalendarClock className="size-4 text-trip-ink-3" />
+                  ) : item.type === "depart" ? (
+                    <PlaneTakeoff className="size-4 text-trip-ink-3" />
                   ) : item.type === "rest" && item.price_by?.includes("ly") ? (
                     <Coffee className="size-4 text-trip-ink-3" />
                   ) : (
