@@ -545,10 +545,12 @@ function Field({
 function Chip({
   on,
   onClick,
+  className,
   children,
 }: {
   on: boolean
   onClick: () => void
+  className?: string
   children: React.ReactNode
 }) {
   return (
@@ -560,7 +562,8 @@ function Chip({
         "inline-flex h-10 items-center justify-center gap-1.5 rounded-full border px-3.5 text-sm whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-trip-fill/25",
         on
           ? "border-trip-fill bg-trip-fill font-semibold text-trip-on-fill"
-          : "border-trip-line-2 bg-trip-sheet text-trip-ink hover:border-trip-fill/50 hover:bg-trip-sheet-2"
+          : "border-trip-line-2 bg-trip-sheet text-trip-ink hover:border-trip-fill/50 hover:bg-trip-sheet-2",
+        className
       )}
     >
       {children}
@@ -966,22 +969,8 @@ export function TripFormSheet({
                         <span className="font-num font-semibold">{b}</span>
                       </Chip>
                     ))}
-                  </ChipGrid>
-                  <input
-                    id="tf-budget"
-                    inputMode="decimal"
-                    value={budgetText}
-                    onChange={(e) => {
-                      const text = e.target.value.replace(/[^\d.,]/g, "")
-                      setBudgetText(text)
-                      const v = Number(text.replace(",", "."))
-                      set("budget", v > 0 ? Math.round(v * 1_000_000) : null)
-                    }}
-                    placeholder="Số khác, VD 6,5"
-                    className={cn(INPUT, "max-w-[180px]")}
-                  />
-                  <div className="grid justify-items-start gap-1.5">
                     <Chip
+                      className="col-span-3"
                       on={Boolean(form.budget_unknown)}
                       onClick={() => {
                         setBudgetText("")
@@ -996,13 +985,26 @@ export function TripFormSheet({
                     >
                       Không giới hạn
                     </Chip>
-                    {form.budget_unknown && (
-                      <p className="text-[12.5px] leading-snug text-trip-ink-3">
-                        Chưa biết bao nhiêu: lịch theo mức chi thường gặp ở điểm
-                        đến (không chọn chỗ đắt nhất), xong sẽ báo tổng ước.
-                      </p>
-                    )}
-                  </div>
+                  </ChipGrid>
+                  {form.budget_unknown && (
+                    <p className="text-[12.5px] leading-snug text-trip-ink-3">
+                      Chưa biết bao nhiêu: lịch theo mức chi thường gặp ở điểm
+                      đến (không chọn chỗ đắt nhất), xong sẽ báo tổng ước.
+                    </p>
+                  )}
+                  <input
+                    id="tf-budget"
+                    inputMode="decimal"
+                    value={budgetText}
+                    onChange={(e) => {
+                      const text = e.target.value.replace(/[^\d.,]/g, "")
+                      setBudgetText(text)
+                      const v = Number(text.replace(",", "."))
+                      set("budget", v > 0 ? Math.round(v * 1_000_000) : null)
+                    }}
+                    placeholder="Số khác, VD 6,5"
+                    className={cn(INPUT, "max-w-[180px]")}
+                  />
                 </Field>
                 {form.budget ? (
                   <ChipGrid min={160}>
