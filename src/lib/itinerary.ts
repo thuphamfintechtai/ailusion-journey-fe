@@ -90,6 +90,8 @@ export type ItineraryItem = {
   /** "busy": lịch bận user nhập, bước chạy thử tự chèn vào lịch ngày (giờ user nhập).
    *  "depart": ngày cuối bận xong sau giờ phải rời chỗ ở — đi thẳng từ chỗ bận ra bến (thay "back"). */
   type: "start" | "visit" | "meal" | "rest" | "busy" | "back" | "depart"
+  /** Chỉ ở web: người dùng bấm "Xoá" chỗ này (gạch ngang, đã trừ tiền), xem plan-skip.ts. */
+  skipped?: boolean
   start: string
   end: string
   name: string

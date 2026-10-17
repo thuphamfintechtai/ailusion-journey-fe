@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils"
 
 import { PlanPanel } from "./plan-panel"
+import { loadSkipped, saveSkipped, withSkipped } from "./plan-skip"
 import { forPeople, trieuRange } from "./plan-shared"
 import { TraceIds } from "@/components/trace-ids"
 
@@ -63,7 +64,9 @@ export function ItineraryView({
     return (
       <Questions result={result} onAnswer={onAnswer} onOpenForm={onOpenForm} />
     )
-  return <Options result={result} onOpenForm={onOpenForm} />
+  // Mỗi lượt lập một bộ chỗ đã xoá (mã phương án PA1–PA3 lặp lại khi lập lại cùng hội thoại).
+  const run = `${result.thread_id}:${result.trace_run_id ?? ""}`
+  return <Options key={run} run={run} result={result} onOpenForm={onOpenForm} />
 }
 
 function Questions({
@@ -148,17 +151,38 @@ function Questions({
 }
 
 function Options({
+  run,
   result,
   onOpenForm,
 }: {
+  /** Mã lượt lập (hội thoại + run), khoá lưu chỗ đã xoá. */
+  run: string
   result: ItineraryResult
   onOpenForm: () => void
 }) {
   const chosen = result.chosen ?? result.options[0]?.id
   const [selected, setSelected] = React.useState(chosen)
-  const option =
-    result.options.find((o) => o.id === selected) ?? result.options[0]
-  if (!option) return null
+  // Chỗ người dùng bấm "Xoá" (theo phương án): gạch ngang, trừ tiền; lưu trong trình duyệt.
+  const skipStore = `ailusion:skip:${run}`
+  // Lộ trình chỉ dựng ở trình duyệt (sau khi lập / tải hội thoại), nên đọc thẳng lúc khởi tạo.
+  const [skipped, setSkipped] = React.useState<Record<string, string[]>>(() =>
+    loadSkipped(skipStore)
+  )
+  const changeSkipped = (id: string, change: (keys: string[]) => string[]) =>
+    setSkipped((prev) => {
+      const next = { ...prev, [id]: change(prev[id] ?? []) }
+      saveSkipped(skipStore, next)
+      return next
+    })
+  const shown = result.options.map((o) =>
+    withSkipped(o, skipped[o.id] ?? [], result.group_size)
+  )
+  const at = Math.max(
+    0,
+    shown.findIndex(([o]) => o.id === selected)
+  )
+  const [option, cut] = shown[at] ?? []
+  if (!option || !cut) return null
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
@@ -210,7 +234,7 @@ function Options({
           aria-label="Phương án"
           className="grid gap-2.5 @xl:grid-cols-3"
         >
-          {result.options.map((o) => (
+          {shown.map(([o, c]) => (
             <OptionCard
               key={o.id}
               option={o}
@@ -218,6 +242,7 @@ function Options({
               recommended={o.id === chosen}
               onSelect={() => setSelected(o.id)}
               groupSize={result.group_size}
+              removed={c.count}
             />
           ))}
         </div>
@@ -252,7 +277,17 @@ function Options({
         </div>
       )}
 
-      <PlanPanel result={result} option={option} />
+      <PlanPanel
+        result={result}
+        option={option}
+        cut={cut}
+        onSkip={(key) =>
+          changeSkipped(option.id, (keys) =>
+            keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]
+          )
+        }
+        onKeepAll={() => changeSkipped(option.id, () => [])}
+      />
 
       {(result.guesses.length > 0 || result.understood.length > 0) && (
         <div className="grid gap-1.5 rounded-xl bg-trip-sheet px-3.5 py-3 text-[13.5px] text-trip-ink-2">
@@ -438,12 +473,15 @@ function OptionCard({
   recommended,
   onSelect,
   groupSize,
+  removed = 0,
 }: {
   option: ItineraryResult["options"][number]
   on: boolean
   recommended: boolean
   onSelect: () => void
   groupSize?: number
+  /** Số chỗ người dùng đã xoá ở phương án này (tổng tiền đã trừ). */
+  removed?: number
 }) {
   const cb = o.cost_breakdown
   // Có khoảng "từ–đến" thì hiện khoảng, lộ trình cũ thì một con số.
@@ -519,6 +557,11 @@ function OptionCard({
             </span>
           )}
         </span>
+        {removed > 0 && (
+          <span className="text-[11.5px] text-trip-ink-3">
+            Đã trừ {removed} chỗ bạn xoá
+          </span>
+        )}
       </span>
 
       {strengths.length > 0 && (
