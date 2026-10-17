@@ -5,6 +5,7 @@
 import * as React from "react"
 import {
   BedDouble,
+  CalendarClock,
   Coffee,
   ChevronRight,
   ExternalLink,
@@ -68,7 +69,9 @@ export function ScheduleTab({
       </TabIntro>
       <DayPills days={days} value={dayIndex} onChange={onDay} />
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
-        {status && (
+        {/* Ngày không xếp gì (tới nơi tối, rời chỗ ở sớm để về): không hiện "Đi được", "ngồi xe
+            0 phút" — ghi chú bên dưới nói vì sao ngày trống. */}
+        {status && day.items.length > 0 && (
           <span
             className={cn(
               "rounded-full px-2.5 py-0.5 font-semibold",
@@ -79,7 +82,7 @@ export function ScheduleTab({
           </span>
         )}
         {day.weather && <span className="text-trip-ink-3">{day.weather}</span>}
-        {day.metrics.ride_min != null && (
+        {day.metrics.ride_min != null && day.items.length > 0 && (
           <span className="text-trip-ink-3">
             ngồi xe {day.metrics.ride_min} phút
           </span>
@@ -123,12 +126,19 @@ export function ScheduleTab({
                 <PlaceCard item={item} onOpen={() => setOpen(item)} />
               ) : (
                 <p className="flex flex-wrap items-center gap-1.5 text-[15px] font-semibold">
-                  {item.type === "rest" && item.price_by?.includes("ly") ? (
+                  {item.type === "busy" ? (
+                    <CalendarClock className="size-4 text-trip-ink-3" />
+                  ) : item.type === "rest" && item.price_by?.includes("ly") ? (
                     <Coffee className="size-4 text-trip-ink-3" />
                   ) : (
                     <BedDouble className="size-4 text-trip-ink-3" />
                   )}
                   {item.name}
+                  {item.type === "busy" && (
+                    <span className="font-num text-[13px] font-normal text-trip-ink-3">
+                      → {item.end}
+                    </span>
+                  )}
                   {item.type === "rest" && (
                     <span className="font-num text-[13px] font-normal text-trip-ink-3">
                       → {item.end}

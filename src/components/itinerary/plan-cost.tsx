@@ -482,6 +482,8 @@ function linesOf(
         part: "transport",
       })
     }
+    // Chặng sau giờ bận đi từ chỗ bận ("Lịch bận → Bảo tàng").
+    if (item.type === "busy") from = item.name
     if (item.type === "rest" && item.place_id) {
       from = item.name
       if (item.price)
