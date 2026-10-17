@@ -82,7 +82,9 @@ export function PlanPanel({
 
   return (
     <TripContext.Provider value={trip}>
-      <section className="@container grid gap-3 rounded-2xl border border-trip-line bg-trip-sheet p-2 sm:p-3">
+      {/* Cột lưới minmax(0,1fr): thanh tab / hàng ngày dài (không xuống dòng) cuộn ngang bên
+          trong thẻ, không kéo cả khung rộng quá thẻ khi khung chat hẹp. */}
+      <section className="@container grid grid-cols-[minmax(0,1fr)] gap-3 rounded-2xl border border-trip-line bg-trip-sheet p-2 sm:p-3">
         <div className="flex items-center gap-3 rounded-xl bg-trip-sheet-2 p-1">
           <div
             role="tablist"

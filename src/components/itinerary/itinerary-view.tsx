@@ -202,21 +202,25 @@ function Options({
         </div>
       )}
 
-      <div
-        role="tablist"
-        aria-label="Phương án"
-        className="grid gap-2.5 sm:grid-cols-3"
-      >
-        {result.options.map((o) => (
-          <OptionCard
-            key={o.id}
-            option={o}
-            on={o.id === option.id}
-            recommended={o.id === chosen}
-            onSelect={() => setSelected(o.id)}
-            groupSize={result.group_size}
-          />
-        ))}
+      {/* 3 cột theo bề ngang khung chứa, không theo cả cửa sổ: khung chat còn thanh bên trái,
+          màn 800px mỗi thẻ chỉ ~125px, thẻ "Đề xuất" tràn ra ngoài. Hẹp thì xếp chồng. */}
+      <div className="@container">
+        <div
+          role="tablist"
+          aria-label="Phương án"
+          className="grid gap-2.5 @xl:grid-cols-3"
+        >
+          {result.options.map((o) => (
+            <OptionCard
+              key={o.id}
+              option={o}
+              on={o.id === option.id}
+              recommended={o.id === chosen}
+              onSelect={() => setSelected(o.id)}
+              groupSize={result.group_size}
+            />
+          ))}
+        </div>
       </div>
       {/* Phương án đề xuất đã được giải thích ở đoạn trên (`result.why`): chỉ giải thích
           thêm khi đang xem phương án khác. */}
@@ -232,9 +236,13 @@ function Options({
           <span className="min-w-0 flex-1">
             <b>{result.stay.name}</b>
             {result.stay.booked ? " · đã đặt" : ""}
-            {result.stay.price_per_night
-              ? ` · ${money(result.stay.price_per_night)}/đêm`
-              : ""}
+            {result.stay.price_per_night ? (
+              <span className="whitespace-nowrap">
+                {` · ${money(result.stay.price_per_night)}/đêm`}
+              </span>
+            ) : (
+              ""
+            )}
           </span>
           {result.stay.total ? (
             <span className="font-num font-semibold">
@@ -420,8 +428,9 @@ function BudgetLevelCard({
 }
 
 /**
- * Thẻ một phương án: tên + nhãn "Đề xuất" cùng hàng (giá các thẻ thẳng hàng nhau), giá ước
- * lớn với đơn vị nhỏ, các điểm mạnh dạng chip. Thẻ đang xem có viền màu chính và dấu tích.
+ * Thẻ một phương án: tên + nhãn "Đề xuất" (xuống dòng khi chật), giá ước lớn với đơn vị nhỏ (không
+ * ngắt giữa khoảng giá), các điểm mạnh dạng chip. Thẻ đang xem có viền màu chính và dấu tích ghim
+ * góc phải.
  */
 function OptionCard({
   option: o,
@@ -454,33 +463,32 @@ function OptionCard({
       aria-selected={on}
       onClick={onSelect}
       className={cn(
-        "group relative grid min-w-0 content-start gap-2.5 rounded-2xl border bg-trip-sheet p-3.5 text-left transition-all duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-trip-fill/30",
+        "group relative grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-2.5 rounded-2xl border bg-trip-sheet p-3.5 text-left transition-all duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-trip-fill/30",
         on
           ? "border-trip-fill bg-accent/40 shadow-[0_8px_24px_-14px_rgb(58_86_197/0.55)] ring-1 ring-trip-fill"
           : "border-trip-line hover:-translate-y-0.5 hover:border-trip-fill/40 hover:shadow-[0_8px_20px_-16px_rgb(18_23_53/0.35)]"
       )}
     >
-      <span className="flex items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-[14px] font-bold text-trip-ink">
-          {o.name}
-        </span>
+      {/* Tên + "Đề xuất" xuống dòng khi chật; dấu tích ghim góc phải. */}
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 pr-7">
+        <span className="text-[14px] font-bold text-trip-ink">{o.name}</span>
         {recommended && (
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[11px] font-bold text-white shadow-sm">
             <Sparkles className="size-3" />
             Đề xuất
           </span>
         )}
-        <span
-          aria-hidden
-          className={cn(
-            "grid size-5 shrink-0 place-items-center rounded-full border transition-colors",
-            on
-              ? "border-trip-fill bg-trip-fill text-trip-on-fill"
-              : "border-trip-line-2 text-transparent"
-          )}
-        >
-          <Check className="size-3" strokeWidth={3} />
-        </span>
+      </span>
+      <span
+        aria-hidden
+        className={cn(
+          "absolute top-3.5 right-3.5 grid size-5 place-items-center rounded-full border transition-colors",
+          on
+            ? "border-trip-fill bg-trip-fill text-trip-on-fill"
+            : "border-trip-line-2 text-transparent"
+        )}
+      >
+        <Check className="size-3" strokeWidth={3} />
       </span>
 
       <span className="grid gap-0.5">
@@ -488,14 +496,21 @@ function OptionCard({
           Ước tính {forPeople(groupSize)}
         </span>
         <span
-          className="flex items-baseline gap-1 text-trip-ink"
+          className="flex flex-wrap items-baseline gap-x-1 text-trip-ink"
           title={
             o.estimated_prices?.length
               ? `Có giá ước (chưa có giá thật): ${o.estimated_prices.join(", ")}`
               : "Khoảng ước, gồm cả phát sinh"
           }
         >
-          <span className="font-display text-[24px] leading-none font-bold tracking-tight">
+          {/* Không ngắt giữa khoảng giá ("23,99–" / "30,06"); khoảng dài ("27,13–34,47") nhỏ
+              chữ lại cho vừa thẻ hẹp. */}
+          <span
+            className={cn(
+              "font-display leading-none font-bold tracking-tight whitespace-nowrap",
+              amount.length > 9 ? "text-[20px]" : "text-[24px]"
+            )}
+          >
             {amount}
           </span>
           {unit && (
