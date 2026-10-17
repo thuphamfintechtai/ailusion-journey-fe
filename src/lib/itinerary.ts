@@ -85,8 +85,9 @@ export type TripForm = {
 }
 
 export type ItineraryItem = {
-  /** "busy": lịch bận user nhập, bước chạy thử tự chèn vào lịch ngày (giờ user nhập). */
-  type: "start" | "visit" | "meal" | "rest" | "busy" | "back"
+  /** "busy": lịch bận user nhập, bước chạy thử tự chèn vào lịch ngày (giờ user nhập).
+   *  "depart": ngày cuối bận xong sau giờ phải rời chỗ ở — đi thẳng từ chỗ bận ra bến (thay "back"). */
+  type: "start" | "visit" | "meal" | "rest" | "busy" | "back" | "depart"
   start: string
   end: string
   name: string

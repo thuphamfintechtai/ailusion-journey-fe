@@ -251,9 +251,12 @@ function fromTripInfo(
   if (info.adults !== null || info.children !== null || info.seniors !== null) {
     next.kids_6_12 = info.children ?? 0
     next.seniors_65 = info.seniors ?? 0
+    // Chưa rõ số người lớn ("đi với con"): người đang chat là 1 người lớn, trừ khi có người lớn
+    // tuổi đi cùng (ông bà dẫn cháu) — không thì form 1 người + 1 trẻ bị LLM từ chối.
+    const adults = info.adults ?? (info.seniors ? 0 : 1)
     next.group_size = Math.max(
       1,
-      (info.adults ?? 0) + (info.children ?? 0) + (info.seniors ?? 0)
+      adults + (info.children ?? 0) + (info.seniors ?? 0)
     )
     if (info.children || info.seniors) next.group_type = "family"
     else if (next.group_size === 1) next.group_type = "solo"
@@ -261,7 +264,12 @@ function fromTripInfo(
   }
   // Trợ lý đã hiểu "đi cùng ai" từ cuộc trò chuyện ("2 vợ chồng" -> cặp đôi): dùng luôn, để
   // pipeline không hỏi lại câu H1.
-  if (info.group_type && GROUP_TYPES.some((g) => g.id === info.group_type)) {
+  // "Một mình" chỉ khi đoàn 1 người (nói "một mình" mà kể cả con đi cùng thì giữ loại đã suy).
+  if (
+    info.group_type &&
+    GROUP_TYPES.some((g) => g.id === info.group_type) &&
+    !(info.group_type === "solo" && next.group_size > 1)
+  ) {
     next.group_type = info.group_type as TripForm["group_type"]
     filled += 1
   }
@@ -588,6 +596,15 @@ export function TripFormSheet({
       ...(key === "budget" || key === "budget_unit"
         ? { budget_min: null }
         : {}),
+      // "Một mình" khớp 1 người (form mặc định 2 người: chọn "Một mình" mà quên sửa số người thì
+      // LLM từ chối "Đi một mình nhưng số người là 2").
+      ...(key === "group_type" && value === "solo" ? { group_size: 1 } : {}),
+      ...(key === "group_type" && value && value !== "solo" && f.group_size < 2
+        ? { group_size: 2 }
+        : {}),
+      ...(key === "group_size" && value !== 1 && f.group_type === "solo"
+        ? { group_type: null }
+        : {}),
     }))
   }
 
@@ -911,7 +928,7 @@ export function TripFormSheet({
 
               <Panel
                 title="Đi cùng ai"
-                hint="Để máy biết đoàn cần gì: chỗ cho trẻ, nhà vệ sinh, lối xe lăn, giờ về."
+                hint="Để máy biết đoàn cần gì: chỗ hợp trẻ em, nhà vệ sinh, lối xe lăn, lịch đỡ mệt."
               >
                 <ChipGrid min={104}>
                   {GROUP_TYPES.map((g) => (
